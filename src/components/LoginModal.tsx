@@ -197,14 +197,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
         {/* Header */}
         <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-6 text-white text-center relative">
           <div className="absolute top-4 right-4 bg-white/10 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider text-indigo-200 uppercase">
-            Portal TKA 2026
+            PORTAL SITAKA 2026
           </div>
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-600/30 mb-3 text-white">
+          <div className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-teal-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-600/30 mb-3 text-white border-2 border-white/20">
             <GraduationCap className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-black tracking-tight">Pilih Hak Akses & Login</h2>
-          <p className="text-xs text-indigo-200 mt-1">
-            Sistem Pendataan Terpadu Siswa TKA, Studi Lanjut, & Inventaris Laptop
+          <h2 className="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
+            SITAKA
+          </h2>
+          <p className="text-[11px] font-semibold text-indigo-200 mt-0.5">
+            <span className="text-amber-300 font-bold">S</span>istem <span className="text-amber-300 font-bold">I</span>nformasi <span className="text-amber-300 font-bold">T</span>es <span className="text-amber-300 font-bold">A</span>kademik, <span className="text-amber-300 font-bold">K</span>arir & <span className="text-amber-300 font-bold">A</span>dministrasi
+          </p>
+          <p className="text-[10px] text-slate-300 mt-1.5 bg-white/10 py-1 px-3 rounded-full inline-block">
+            Portal Pendataan Terpadu Siswa, Guru, Proktor & Orang Tua
           </p>
         </div>
 

@@ -237,9 +237,12 @@ export const AppsScriptView: React.FC = () => {
             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold inline-flex items-center justify-center text-xs">
               3
             </span>
-            <h5 className="font-bold text-slate-800 text-sm">Deploy sebagai Web App</h5>
+            <h5 className="font-bold text-slate-800 text-sm">Deploy &amp; Otorisasi Google Drive</h5>
             <p className="text-slate-600 leading-relaxed">
               Klik tombol <strong className="text-indigo-600">Deploy &gt; New deployment</strong>. Pilih type <strong className="text-slate-800">Web app</strong>. Atur <em className="text-slate-800 font-semibold">Who has access</em> menjadi <strong className="text-emerald-700">"Anyone" (Siapa Saja)</strong>.
+            </p>
+            <p className="text-[11px] text-amber-700 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1">
+              📌 <strong>Tips Folder Pasfoto:</strong> Saat Deploy/Otorisasi, berikan izin akses ke Google Drive agar folder <code>Pasfoto_Siswa_TKA</code> otomatis dibuat saat pertama kali foto disimpan.
             </p>
           </div>
 

@@ -1,6 +1,6 @@
 {
-  "name": "Administrasi Pendataan TKA & Studi Lanjut",
-  "description": "Aplikasi pendataan siswa untuk TKA dan pilihan Studi Lanjut dengan menu navigasi kiri, manajemen data siswa, statistik mapel/prodi, serta generator Google Apps Script.",
+  "name": "SITAKA - Sistem Informasi TKA & Karir Siswa",
+  "description": "SITAKA (Sistem Informasi Tes Akademik, Karir, & Administrasi) - Pendataan terpadu TKA, Pilihan Studi Lanjut, & Sarana Laptop Ujian untuk Siswa, Guru, dan Orang Tua.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

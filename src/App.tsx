@@ -21,7 +21,9 @@ import {
   saveDocSettings,
   DEFAULT_DOCUMENT_SETTINGS,
   addSecurityLog,
-  saveStudents
+  saveStudents,
+  saveLaptops,
+  saveProktorTeknisi
 } from './utils/storage';
 import { subscribeStudentsFromFirestore, syncStudentToFirestore } from './firebase';
 import { Sidebar } from './components/Sidebar';
@@ -57,14 +59,47 @@ export default function App() {
     akreditasi?: string;
   } | null>(null);
 
-  // Initial load & Firestore Realtime Sync
+  const syncFromGoogleSheets = async (urlOverride?: string): Promise<boolean> => {
+    const url = urlOverride || appsScriptUrl || getAppsScriptUrl();
+    if (!url) return false;
+
+    try {
+      const res = await fetch(url.trim(), { method: 'GET' });
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        if (json.laptops && Array.isArray(json.laptops) && json.laptops.length > 0) {
+          saveLaptops(json.laptops);
+          setLaptops(json.laptops);
+        }
+        if (json.proktorList && Array.isArray(json.proktorList) && json.proktorList.length > 0) {
+          saveProktorTeknisi(json.proktorList);
+          setProktorList(json.proktorList);
+        }
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          saveStudents(json.data);
+          setStudents(json.data);
+        }
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.warn('Sync from Google Sheets error:', err);
+      return false;
+    }
+  };
+
+  // Initial load & Firestore Realtime Sync & Auto Sync Google Sheets
   useEffect(() => {
     const localList = getStoredStudents();
     setStudents(localList);
     setLaptops(getStoredLaptops());
     setProktorList(getStoredProktorTeknisi());
     setDocSettings(getStoredDocSettings());
-    setAppsScriptUrl(getAppsScriptUrl());
+    const gasUrl = getAppsScriptUrl();
+    setAppsScriptUrl(gasUrl);
+    if (gasUrl) {
+      syncFromGoogleSheets(gasUrl);
+    }
 
     // Subscribe to Firestore changes
     const unsubscribe = subscribeStudentsFromFirestore((remoteStudents) => {
@@ -77,7 +112,27 @@ export default function App() {
       }
     });
 
-    return () => unsubscribe();
+    // Auto sync with Google Sheets periodically (every 45 seconds) & on window focus
+    let intervalId: any = null;
+    if (gasUrl) {
+      intervalId = setInterval(() => {
+        syncFromGoogleSheets(gasUrl);
+      }, 45000);
+    }
+
+    const handleFocus = () => {
+      const currentGasUrl = getAppsScriptUrl();
+      if (currentGasUrl) {
+        syncFromGoogleSheets(currentGasUrl);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      unsubscribe();
+      if (intervalId) clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Inactivity Auto-Logout Timeout (15 minutes = 900 seconds)
@@ -177,7 +232,7 @@ export default function App() {
       try {
         fetch(appsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ target: 'laptop', action: 'saveLaptop', laptop: newLaptop }),
         }).catch((err) => console.log('Apps Script Laptop sync note:', err));
       } catch (err) {}
@@ -196,7 +251,7 @@ export default function App() {
       try {
         fetch(appsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ target: 'laptop', action: 'saveLaptop', laptop: data }),
         }).catch((err) => console.log('Apps Script Laptop sync note:', err));
       } catch (err) {}
@@ -215,7 +270,7 @@ export default function App() {
       try {
         fetch(appsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ target: 'laptop', action: 'deleteLaptop', id }),
         }).catch((err) => console.log('Apps Script Laptop sync note:', err));
       } catch (err) {}
@@ -238,7 +293,7 @@ export default function App() {
       try {
         fetch(appsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ target: 'proktor', action: 'saveProktor', proktor: newProktor }),
         }).catch((err) => console.log('Apps Script Proktor sync note:', err));
       } catch (err) {}
@@ -254,7 +309,7 @@ export default function App() {
       try {
         fetch(appsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ target: 'proktor', action: 'saveProktor', proktor: data }),
         }).catch((err) => console.log('Apps Script Proktor sync note:', err));
       } catch (err) {}
@@ -270,7 +325,7 @@ export default function App() {
       try {
         fetch(appsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ target: 'proktor', action: 'deleteProktor', id }),
         }).catch((err) => console.log('Apps Script Proktor sync note:', err));
       } catch (err) {}
@@ -297,14 +352,23 @@ export default function App() {
       return;
     }
 
+    let savedStudentObj: Student;
+
     if (userRole === 'siswa' && currentUserNis) {
       const list = getStoredStudents();
       const existing = list.find((s) => s.nis === currentUserNis);
       const payload = { ...data, nis: currentUserNis };
       if (existing) {
-        updateStudent({ ...existing, ...payload } as Student);
+        savedStudentObj = { ...existing, ...payload } as Student;
+        updateStudent(savedStudentObj);
       } else {
-        addStudent(payload);
+        const newObj: Student = {
+          id: 'std-' + Date.now(),
+          ...payload,
+          updatedAt: new Date().toISOString()
+        } as Student;
+        addStudent(newObj);
+        savedStudentObj = newObj;
       }
       addSecurityLog({
         role: 'siswa',
@@ -319,11 +383,28 @@ export default function App() {
       setStudents(refreshed);
       const updatedCurrent = refreshed.find(s => s.nis === currentUserNis);
       if (updatedCurrent) setEditingStudent(updatedCurrent);
+
+      // Apps Script Auto Sync
+      if (appsScriptUrl) {
+        try {
+          fetch(appsScriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              target: 'student',
+              action: 'save',
+              student: savedStudentObj,
+            }),
+          }).catch((err) => console.log('Apps Script Student sync note:', err));
+        } catch (err) {}
+      }
+
       return;
     }
 
     if ('id' in data && data.id) {
-      updateStudent(data as Student);
+      savedStudentObj = data as Student;
+      updateStudent(savedStudentObj);
       addSecurityLog({
         role: userRole || 'superadmin',
         action: 'UPDATE_STUDENT',
@@ -332,7 +413,13 @@ export default function App() {
         details: `Memperbarui data siswa (${data.namaSiswa}, NIS: ${data.nis})`,
       });
     } else {
-      addStudent(data);
+      const newObj: Student = {
+        id: 'std-' + Date.now(),
+        ...data,
+        updatedAt: new Date().toISOString()
+      } as Student;
+      addStudent(newObj);
+      savedStudentObj = newObj;
       addSecurityLog({
         role: userRole || 'superadmin',
         action: 'ADD_STUDENT',
@@ -341,6 +428,22 @@ export default function App() {
         details: `Menambah siswa baru (${data.namaSiswa}, NIS: ${data.nis})`,
       });
     }
+
+    // Apps Script Auto Sync
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            target: 'student',
+            action: 'save',
+            student: savedStudentObj,
+          }),
+        }).catch((err) => console.log('Apps Script Student sync note:', err));
+      } catch (err) {}
+    }
+
     const refreshed = getStoredStudents();
     setStudents(refreshed);
     setEditingStudent(null);
@@ -355,6 +458,21 @@ export default function App() {
     }
     const target = students.find((s) => s.id === id);
     deleteStudent(id);
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            target: 'student',
+            action: 'delete',
+            id,
+          }),
+        }).catch((err) => console.log('Apps Script Student delete note:', err));
+      } catch (err) {}
+    }
+
     addSecurityLog({
       role: userRole || 'superadmin',
       action: 'DELETE_STUDENT',
@@ -507,6 +625,9 @@ export default function App() {
               laptops={laptops}
               proktorList={proktorList}
               docSettings={docSettings}
+              appsScriptUrl={appsScriptUrl}
+              onSyncGoogleSheets={syncFromGoogleSheets}
+              onNavigateToAppScript={() => setActiveTab('appscript')}
               onAddLaptop={handleAddLaptop}
               onUpdateLaptop={handleUpdateLaptop}
               onDeleteLaptop={handleDeleteLaptop}

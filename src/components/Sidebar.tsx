@@ -158,23 +158,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Header Brand */}
         <div className="p-5 border-b border-slate-800/80 bg-slate-950/40">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-indigo-600/90 text-white rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center">
+            <div className="p-2.5 bg-gradient-to-tr from-indigo-600 to-teal-500 text-white rounded-2xl shadow-lg shadow-indigo-600/30 flex items-center justify-center">
               <GraduationCap className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-base tracking-tight text-white flex items-center gap-1.5">
-                Admin TKA & Studi
-              </h1>
-              <p className="text-xs text-slate-400 font-medium">
-                Sistem Pendataan Terpadu
+              <div className="flex items-center gap-1.5">
+                <h1 className="font-black text-lg tracking-wider text-white">
+                  SITAKA
+                </h1>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-1.5 py-0.5 rounded border border-emerald-500/30">
+                  TKA 2026
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 font-medium leading-tight">
+                Sistem Informasi TKA & Karir
               </p>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] bg-slate-800/60 rounded-lg px-2.5 py-1.5 text-slate-300 border border-slate-700/50">
-            <span className="flex items-center gap-1 text-indigo-300 font-semibold">
-              <Sparkles className="w-3.5 h-3.5" /> App Script Ready
+            <span className="flex items-center gap-1 text-indigo-300 font-semibold truncate">
+              <Sparkles className="w-3.5 h-3.5 shrink-0" /> Integrasi App Script
             </span>
-            <span className="bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">
+            <span className="bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
               v2.6
             </span>
           </div>

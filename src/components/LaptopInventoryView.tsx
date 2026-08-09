@@ -22,7 +22,9 @@ import {
   ShieldCheck,
   CheckSquare,
   Tag,
-  QrCode
+  QrCode,
+  FileSpreadsheet,
+  RefreshCw
 } from 'lucide-react';
 import {
   Student,
@@ -76,6 +78,9 @@ interface LaptopInventoryViewProps {
   laptops: LaptopData[];
   proktorList: ProktorTeknisi[];
   docSettings: DocumentSettings;
+  appsScriptUrl?: string;
+  onSyncGoogleSheets?: () => Promise<boolean>;
+  onNavigateToAppScript?: () => void;
   onAddLaptop: (data: Omit<LaptopData, 'id' | 'updatedAt'>) => void;
   onUpdateLaptop: (data: LaptopData) => void;
   onDeleteLaptop: (id: string) => void;
@@ -92,6 +97,9 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
   laptops,
   proktorList,
   docSettings,
+  appsScriptUrl,
+  onSyncGoogleSheets,
+  onNavigateToAppScript,
   onAddLaptop,
   onUpdateLaptop,
   onDeleteLaptop,
@@ -104,6 +112,18 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
 }) => {
   // Sub-tab Navigation: 'laptops' | 'proktor' | 'settings'
   const [activeSubTab, setActiveSubTab] = useState<'laptops' | 'proktor' | 'settings'>('laptops');
+
+  // Sync Google Sheets State
+  const [isSyncingGas, setIsSyncingGas] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Delete Confirmation Modal State
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    type: 'laptop' | 'proktor' | 'resetLaptops';
+    id?: string;
+    title: string;
+    details?: string;
+  } | null>(null);
 
   // Search & Filters for Laptop
   const [searchQuery, setSearchQuery] = useState('');
@@ -626,6 +646,77 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
         </div>
       </div>
 
+      {/* GOOGLE SHEETS LIVE SYNC BANNER */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-lg border border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
+            <FileSpreadsheet className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xs text-white">Integrasi Google Sheets Backend</span>
+              {appsScriptUrl ? (
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Tersambung
+                </span>
+              ) : (
+                <span className="bg-amber-500/20 text-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-amber-500/30">
+                  Belum Diatur
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-300">
+              Sinkronisasi data otomatis dengan Sheets: <code className="text-teal-300 font-mono">Pendataan_Laptop_Sarana</code> & <code className="text-sky-300 font-mono">Proktor_Teknisi_Lab</code>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          {syncMessage && (
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${syncMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+              {syncMessage.text}
+            </span>
+          )}
+
+          {appsScriptUrl ? (
+            <button
+              type="button"
+              disabled={isSyncingGas}
+              onClick={async () => {
+                if (onSyncGoogleSheets) {
+                  setIsSyncingGas(true);
+                  setSyncMessage(null);
+                  const ok = await onSyncGoogleSheets();
+                  setIsSyncingGas(false);
+                  if (ok) {
+                    setSyncMessage({ type: 'success', text: 'Data dari Google Sheets berhasil diperbarui!' });
+                    setTimeout(() => setSyncMessage(null), 4000);
+                  } else {
+                    setSyncMessage({ type: 'error', text: 'Gagal mengambil data dari Google Sheets.' });
+                    setTimeout(() => setSyncMessage(null), 4000);
+                  }
+                }
+              }}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-2 transition-all disabled:opacity-50 shrink-0 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGas ? 'animate-spin' : ''}`} />
+              <span>{isSyncingGas ? 'Menyinkronkan...' : 'Sinkronkan Google Sheets'}</span>
+            </button>
+          ) : (
+            onNavigateToAppScript && (
+              <button
+                type="button"
+                onClick={onNavigateToAppScript}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Atur URL Google Apps Script</span>
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
       {/* SUB-TAB 1: DAFTAR LAPTOP SISWA */}
       {activeSubTab === 'laptops' && (
         <div className="space-y-6 animate-in fade-in duration-150">
@@ -765,9 +856,11 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
 
               <button
                 onClick={() => {
-                  if (window.confirm('Reset data laptop ke contoh sampel bawaan?')) {
-                    onResetLaptops();
-                  }
+                  setDeleteConfirm({
+                    type: 'resetLaptops',
+                    title: 'Reset Semua Data Laptop Ke Sampel Bawaan',
+                    details: 'Tindakan ini akan mengembalikan seluruh daftar laptop ke contoh sampel data awal.'
+                  });
                 }}
                 className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors"
                 title="Reset Contoh Data Laptop"
@@ -933,9 +1026,12 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
 
                             <button
                               onClick={() => {
-                                if (window.confirm(`Hapus data laptop milik ${laptop.namaSiswa}?`)) {
-                                  onDeleteLaptop(laptop.id);
-                                }
+                                setDeleteConfirm({
+                                  type: 'laptop',
+                                  id: laptop.id,
+                                  title: `Hapus Data Laptop Pemilik: ${laptop.namaSiswa || 'Siswa'}`,
+                                  details: `Merk: ${laptop.merkLaptop || '-'} | Kelas: ${laptop.kelas || '-'} | Ruang: ${laptop.kodeRuang || '-'}, Meja ${laptop.noUrutLaptop || '-'}`
+                                });
                               }}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                               title="Hapus Data"
@@ -1038,9 +1134,12 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
                             </button>
                             <button
                               onClick={() => {
-                                if (window.confirm(`Hapus data penugasan ${item.kodeRuang}?`)) {
-                                  onDeleteProktor(item.id);
-                                }
+                                setDeleteConfirm({
+                                  type: 'proktor',
+                                  id: item.id,
+                                  title: `Hapus Penugasan Ruang Lab: ${item.kodeRuang}`,
+                                  details: `Proktor: ${item.namaProktor || '-'} | Teknisi: ${item.namaTeknisi || '-'}`
+                                });
                               }}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                               title="Hapus Data"
@@ -2295,6 +2394,55 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-100 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Konfirmasi Hapus Data</h3>
+                <p className="text-xs text-slate-500">Apakah Anda yakin ingin menghapus data ini?</p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50/80 border border-rose-200 rounded-xl p-3.5 text-xs text-slate-700">
+              <p className="font-bold text-slate-900">{deleteConfirm.title}</p>
+              {deleteConfirm.details && <p className="text-slate-600 mt-1">{deleteConfirm.details}</p>}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (deleteConfirm.type === 'laptop' && deleteConfirm.id) {
+                    onDeleteLaptop(deleteConfirm.id);
+                  } else if (deleteConfirm.type === 'proktor' && deleteConfirm.id) {
+                    onDeleteProktor(deleteConfirm.id);
+                  } else if (deleteConfirm.type === 'resetLaptops') {
+                    onResetLaptops();
+                  }
+                  setDeleteConfirm(null);
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm shadow-rose-600/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Sekarang</span>
+              </button>
             </div>
           </div>
         </div>

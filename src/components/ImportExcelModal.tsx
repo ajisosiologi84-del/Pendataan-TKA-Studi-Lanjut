@@ -90,7 +90,7 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
               fetch(gasUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'save', student: st }),
+                body: JSON.stringify({ action: 'save', target: 'student', student: st }),
               })
             )
           );

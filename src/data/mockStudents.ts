@@ -453,6 +453,11 @@ function parseStudentRow(row) {
     }
   } catch (err) {}
 
+  var fotoVal = row[7] ? row[7].toString() : "";
+  if (fotoVal.indexOf('=IMAGE("') === 0) {
+    fotoVal = fotoVal.replace('=IMAGE("', '').replace('")', '');
+  }
+
   return {
     id: row[0] ? row[0].toString() : "",
     namaSiswa: row[1] ? row[1].toString() : "",
@@ -461,7 +466,7 @@ function parseStudentRow(row) {
     kelas: row[4] ? row[4].toString() : "",
     jenisKelamin: row[5] ? row[5].toString() : "L",
     noHp: row[6] ? row[6].toString() : "",
-    fotoSiswa: row[7] ? row[7].toString() : "",
+    fotoSiswa: fotoVal,
     mapelTka1: row[8] ? row[8].toString() : "",
     mapelTka2: row[9] ? row[9].toString() : "",
     pilihanStudiLanjut: row[10] ? row[10].toString() : "Kuliah",
@@ -520,11 +525,21 @@ function parseProktorRow(row) {
 
 function doPost(e) {
   try {
-    const contents = JSON.parse(e.postData.contents);
-    const action = contents.action || "save";
-    const target = contents.target || "student";
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheets = setupAllSheets();
+    var contents = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        contents = JSON.parse(e.postData.contents);
+      } catch (err) {
+        contents = e.parameter || {};
+      }
+    } else if (e && e.parameter) {
+      contents = e.parameter;
+    }
+
+    var action = contents.action || "save";
+    var target = contents.target || "student";
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = setupAllSheets();
 
     if (target === "laptop" || action === "saveLaptop" || action === "deleteLaptop") {
       return handleLaptopPost(sheets.sheetLaptops, action, contents);
@@ -538,6 +553,65 @@ function doPost(e) {
   } catch (error) {
     return responseJSON({ status: "error", message: error.toString() });
   }
+}
+
+function processFotoSiswa(fotoData, namaSiswa, nisn, nis) {
+  if (!fotoData) return "";
+  
+  var str = fotoData.toString().trim();
+  
+  if (str.indexOf("=IMAGE") === 0) return str;
+  if (str.indexOf("http://") === 0 || str.indexOf("https://") === 0) {
+    if (str.indexOf("drive.google.com") > -1) {
+      return '=IMAGE("' + str + '")';
+    }
+    return '=IMAGE("' + str + '")';
+  }
+
+  if (str.indexOf("data:image") === 0) {
+    try {
+      var folderName = "Pasfoto_Siswa_TKA";
+      var folder;
+      var folders = DriveApp.getFoldersByName(folderName);
+      
+      if (folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder(folderName);
+      }
+      
+      var parts = str.split(",");
+      var contentType = "image/jpeg";
+      if (parts[0].indexOf(":") > -1 && parts[0].indexOf(";") > -1) {
+        contentType = parts[0].match(/:(.*?);/)[1] || "image/jpeg";
+      }
+      var base64Str = parts[1] || parts[0];
+      var decodedBytes = Utilities.base64Decode(base64Str);
+      
+      var cleanNisn = (nisn || "").toString().trim().replace(/[^a-zA-Z0-9]/g, "");
+      var cleanNis = (nis || "").toString().trim().replace(/[^a-zA-Z0-9]/g, "");
+      var cleanNama = (namaSiswa || "pasfoto").toString().trim().replace(/[^a-zA-Z0-9]/g, "_");
+      
+      var fileNamePrefix = cleanNisn || cleanNis || "Siswa";
+      var fileName = fileNamePrefix + "_" + cleanNama + ".jpg";
+      
+      var blob = Utilities.newBlob(decodedBytes, contentType, fileName);
+      
+      var file = folder.createFile(blob);
+      
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (shareErr) {}
+      
+      var fileId = file.getId();
+      var directUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+      return '=IMAGE("' + directUrl + '")';
+    } catch (err) {
+      return '=IMAGE("https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(namaSiswa || 'Siswa') + '")';
+    }
+  }
+
+  return str;
 }
 
 function handleStudentPost(sheet, action, contents) {
@@ -555,7 +629,8 @@ function handleStudentPost(sheet, action, contents) {
 
     var jmlPrestasi = (student.prestasiList && Array.isArray(student.prestasiList)) ? student.prestasiList.length : 0;
     var detailPrestasiJson = (student.prestasiList && Array.isArray(student.prestasiList)) ? JSON.stringify(student.prestasiList) : "";
-    
+    var fotoProcessed = processFotoSiswa(student.fotoSiswa, student.namaSiswa, student.nisn, student.nis);
+
     const rowData = [
       student.id || "std-" + Date.now(),
       student.namaSiswa || "",
@@ -564,7 +639,7 @@ function handleStudentPost(sheet, action, contents) {
       student.kelas || "",
       student.jenisKelamin || "L",
       student.noHp || "",
-      student.fotoSiswa || "",
+      fotoProcessed,
       student.mapelTka1 || "",
       student.mapelTka2 || "",
       student.pilihanStudiLanjut || "Kuliah",

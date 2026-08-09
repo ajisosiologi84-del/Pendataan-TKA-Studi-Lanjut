@@ -273,14 +273,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         
         <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 text-xs font-semibold px-3 py-1 rounded-full border border-indigo-400/30 mb-3">
-            <Sparkles className="w-3.5 h-3.5" /> Administrasi & Pendataan Siswa TKA
+          <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 text-xs font-bold px-3 py-1 rounded-full border border-indigo-400/30 mb-3">
+            <Sparkles className="w-3.5 h-3.5" /> SITAKA 2026 • Portal Terpadu Sekolah
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white mb-2">
-            Selamat Datang di Portal Pendataan TKA & Studi Lanjut
+          <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white mb-2">
+            Selamat Datang di <span className="bg-gradient-to-r from-amber-300 via-emerald-300 to-teal-200 bg-clip-text text-transparent">SITAKA</span>
           </h1>
-          <p className="text-slate-300 text-xs lg:text-sm leading-relaxed mb-6">
-            Aplikasi administrasi pendataan siswa kelas XII untuk persiapan Tes Kemampuan Akademik (TKA) dan pemilihan program studi perguruan tinggi (Studi Lanjut).
+          <p className="text-slate-200 text-xs lg:text-sm leading-relaxed mb-6 font-medium">
+            <strong className="text-amber-300 font-bold">SITAKA</strong> (Sistem Informasi Tes Akademik, Karir, & Administrasi) — Portal resmi pendataan siswa kelas XII untuk persiapan Tes Kemampuan Akademik (TKA), kelayakan laptop ujian, serta rujukan program studi PTN (Studi Lanjut).
           </p>
 
           <div className="flex flex-wrap gap-3">
