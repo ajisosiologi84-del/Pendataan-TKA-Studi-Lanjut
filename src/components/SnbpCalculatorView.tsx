@@ -119,6 +119,10 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
     if (st.mapelTka2) setMapelPendukung2(st.mapelTka2);
   };
 
+  // Weight Configuration (Default: 50% Rapor + 50% Mapel Pendukung)
+  const [bobotRapor, setBobotRapor] = useState<number>(50); // Maks 50%
+  const bobotMapelPendukung = useMemo(() => 100 - bobotRapor, [bobotRapor]);
+
   // Calculations
   const rataRataRapor = useMemo(() => {
     const sum = Number(sem1) + Number(sem2) + Number(sem3) + Number(sem4) + Number(sem5);
@@ -129,22 +133,34 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
     return Math.round(((Number(nilaiMapel1) + Number(nilaiMapel2)) / 2) * 100) / 100;
   }, [nilaiMapel1, nilaiMapel2]);
 
-  // Trend Bonus
+  // Formula Resmi SNBP Permendikbud (Maks 50% Rapor + Maks 50% Mapel Pendukung)
+  // Skala 100
+  const nilaiMurni100 = useMemo(() => {
+    const pRapor = (rataRataRapor * bobotRapor) / 100;
+    const pMapel = (rataRataMapelPendukung * bobotMapelPendukung) / 100;
+    return Math.round((pRapor + pMapel) * 100) / 100;
+  }, [rataRataRapor, rataRataMapelPendukung, bobotRapor, bobotMapelPendukung]);
+
+  // Skala 100 (Komponen 1: Max 50 Poin + Komponen 2: Max 50 Poin)
+  const skorRaporPoin = useMemo(() => Math.round(((rataRataRapor * bobotRapor) / 100) * 10) / 10, [rataRataRapor, bobotRapor]);
+  const skorMapelPoin = useMemo(() => Math.round(((rataRataMapelPendukung * bobotMapelPendukung) / 100) * 10) / 10, [rataRataMapelPendukung, bobotMapelPendukung]);
+
+  // Trend Bonus (Skala 100)
   const trendRapor = useMemo(() => {
     const isUp = sem5 >= sem4 && sem4 >= sem3 && sem3 >= sem2 && sem2 >= sem1;
-    if (isUp) return 15; // Bonus grafik naik
-    if (sem5 >= sem1) return 5;
+    if (isUp) return 1.5; // Bonus +1.5 Poin
+    if (sem5 >= sem1) return 0.5;
     return 0;
   }, [sem1, sem2, sem3, sem4, sem5]);
 
-  // Bonus Prestasi
+  // Bonus Prestasi (Skala 100)
   const bonusPrestasiScore = useMemo(() => {
     if (prestasiTingkat === 'Tidak Ada') return 0;
     let base = 0;
-    if (prestasiTingkat === 'Internasional') base = 50;
-    else if (prestasiTingkat === 'Nasional') base = 35;
-    else if (prestasiTingkat === 'Provinsi') base = 20;
-    else if (prestasiTingkat === 'Kabupaten') base = 10;
+    if (prestasiTingkat === 'Internasional') base = 5.0;
+    else if (prestasiTingkat === 'Nasional') base = 3.5;
+    else if (prestasiTingkat === 'Provinsi') base = 2.0;
+    else if (prestasiTingkat === 'Kabupaten') base = 1.0;
 
     let multiplier = 1;
     if (prestasiJuara === 'Juara 1') multiplier = 1.0;
@@ -154,7 +170,7 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
 
     let typeBonus = jenisPrestasi === 'Akademik' ? 1.1 : 1.0;
 
-    return Math.round(base * multiplier * typeBonus);
+    return Math.round(base * multiplier * typeBonus * 10) / 10;
   }, [prestasiTingkat, prestasiJuara, jenisPrestasi]);
 
   // Indeks Sekolah Score
@@ -166,40 +182,26 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
     return Math.round((akredBonus * 0.6) + (indeksAlumni * 0.4));
   }, [akreditasiSekolah, indeksAlumni]);
 
-  // Final Composite Score (0 - 1000)
+  // Final Composite Score (Skala 100)
   const skorAkhirSnbp = useMemo(() => {
-    // Component 1: Rata-Rapor (50% weight) -> scale to 500
-    const scoreRapor = (rataRataRapor / 100) * 500;
-
-    // Component 2: Mapel Pendukung (25% weight) -> scale to 250
-    const scorePendukung = (rataRataMapelPendukung / 100) * 250;
-
-    // Component 3: Indeks Sekolah (15% weight) -> scale to 150
-    const scoreIndeks = (indeksSekolahScore / 100) * 150;
-
-    // Component 4: Bonus Prestasi & Trend (10% weight) -> up to 100
-    const scoreBonus = Math.min(100, bonusPrestasiScore + trendRapor);
-
-    const total = Math.round(scoreRapor + scorePendukung + scoreIndeks + scoreBonus);
-    return Math.min(1000, Math.max(0, total));
-  }, [rataRataRapor, rataRataMapelPendukung, indeksSekolahScore, bonusPrestasiScore, trendRapor]);
+    const baseSkor = skorRaporPoin + skorMapelPoin;
+    const faktorSekolah = 0.85 + (indeksSekolahScore / 100) * 0.15; // range 0.85 - 1.00
+    const total = baseSkor * faktorSekolah + bonusPrestasiScore + trendRapor;
+    return Math.min(100, Math.max(0, Math.round(total * 10) / 10));
+  }, [skorRaporPoin, skorMapelPoin, indeksSekolahScore, bonusPrestasiScore, trendRapor]);
 
   // Evaluate Peluang Lolos for Choice 1 & Choice 2
   const getPeluang = (keketatanPct: number) => {
-    // Target minimal skor berdasarkan keketatan
-    // Keketatan < 2% -> Butuh skor ~880+
-    // Keketatan 2-5% -> Butuh skor ~830+
-    // Keketatan 5-10% -> Butuh skor ~780+
-    // Keketatan > 10% -> Butuh skor ~720+
-    let requiredScore = 800;
-    if (keketatanPct < 2) requiredScore = 880;
-    else if (keketatanPct < 4) requiredScore = 840;
-    else if (keketatanPct < 8) requiredScore = 790;
-    else requiredScore = 730;
+    // Target minimal skor (skala 100)
+    let requiredScore = 80;
+    if (keketatanPct < 2) requiredScore = 88;
+    else if (keketatanPct < 4) requiredScore = 84;
+    else if (keketatanPct < 8) requiredScore = 79;
+    else requiredScore = 73;
 
     const diff = skorAkhirSnbp - requiredScore;
 
-    if (diff >= 40) {
+    if (diff >= 4) {
       return {
         label: 'SANGAT TINGGI',
         color: 'bg-emerald-500 text-white border-emerald-600',
@@ -219,7 +221,7 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
         pct: '65% - 84%',
         desc: 'Kompetitif! Peluang lolos terbuka lebar jika belum ada alumni bertumpuk di prodi yang sama.'
       };
-    } else if (diff >= -40) {
+    } else if (diff >= -4) {
       return {
         label: 'MODERAT / SEDANG',
         color: 'bg-amber-500 text-white border-amber-600',
@@ -723,14 +725,55 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
             </div>
 
             {/* Score Display */}
-            <div className="text-center py-4 bg-slate-950/70 rounded-2xl border border-slate-800 relative">
-              <span className="text-xs text-slate-400 block mb-1">ESTIMASI SKOR SNBP (SKALA 1000)</span>
-              <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-indigo-300 to-amber-300 tracking-tight">
-                {skorAkhirSnbp}
+            <div className="text-center py-4 bg-slate-950/70 rounded-2xl border border-slate-800 relative space-y-2">
+              <div>
+                <span className="text-[10px] text-teal-400 font-bold uppercase tracking-widest block">NILAI MURNI SNBP (SKALA 100)</span>
+                <div className="text-4xl font-black text-teal-300 font-mono tracking-tight">
+                  {nilaiMurni100} <span className="text-sm font-normal text-slate-400">/ 100</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  Formula: ({bobotRapor}% × {rataRataRapor}) + ({bobotMapelPendukung}% × {rataRataMapelPendukung})
+                </div>
               </div>
-              <span className="text-[11px] text-slate-400 mt-2 block">
-                Predikat: {skorAkhirSnbp >= 850 ? '🌟 DENGAN PUJIAN / SUPER KETAT' : skorAkhirSnbp >= 780 ? '✨ SANGAT KOMPETITIF' : '👍 CUKUP BAIK'}
-              </span>
+
+              <div className="pt-3 border-t border-slate-800/80">
+                <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest block">SKOR RASIONALISASI PTN (SKALA 100)</span>
+                <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-indigo-300 to-amber-300 tracking-tight">
+                  {skorAkhirSnbp} <span className="text-sm font-normal text-slate-400">/ 100</span>
+                </div>
+                <span className="text-[11px] text-slate-300 mt-1 block">
+                  Predikat: {skorAkhirSnbp >= 85 ? '🌟 DENGAN PUJIAN / SUPER KETAT' : skorAkhirSnbp >= 78 ? '✨ SANGAT KOMPETITIF' : '👍 CUKUP BAIK'}
+                </span>
+              </div>
+            </div>
+
+            {/* Config Bobot Slider */}
+            <div className="p-3 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-2 text-xs">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold text-slate-300">Pengaturan Bobot Komponen:</span>
+                <button
+                  type="button"
+                  onClick={() => setBobotRapor(50)}
+                  className="text-[10px] text-indigo-400 hover:underline font-bold"
+                >
+                  Reset Default (50% : 50%)
+                </button>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>Rapor Seluruh Mapel: <strong className="text-teal-300">{bobotRapor}%</strong> (Maks 50%)</span>
+                  <span>Mapel Pendukung Prodi: <strong className="text-sky-300">{bobotMapelPendukung}%</strong> (Maks 50%)</span>
+                </div>
+                <input
+                  type="range"
+                  min="30"
+                  max="50"
+                  step="5"
+                  value={bobotRapor}
+                  onChange={(e) => setBobotRapor(Number(e.target.value))}
+                  className="w-full accent-teal-400"
+                />
+              </div>
             </div>
 
             {/* Visual Breakdown Bars */}
@@ -739,8 +782,8 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
 
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-slate-400">Rata Rapor ({rataRataRapor})</span>
-                  <span className="font-bold text-teal-300">{Math.round((rataRataRapor / 100) * 500)} / 500</span>
+                  <span className="text-slate-400">1. Rata Rapor ({rataRataRapor}) - Bobot {bobotRapor}%</span>
+                  <span className="font-bold text-teal-300">{skorRaporPoin} / {bobotRapor} Poin</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                   <div className="bg-teal-400 h-full rounded-full transition-all duration-500" style={{ width: `${(rataRataRapor / 100) * 100}%` }} />
@@ -749,8 +792,8 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
 
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-slate-400">Mapel Pendukung ({rataRataMapelPendukung})</span>
-                  <span className="font-bold text-sky-300">{Math.round((rataRataMapelPendukung / 100) * 250)} / 250</span>
+                  <span className="text-slate-400">2. Mapel Pendukung ({rataRataMapelPendukung}) - Bobot {bobotMapelPendukung}%</span>
+                  <span className="font-bold text-sky-300">{skorMapelPoin} / {bobotMapelPendukung} Poin</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                   <div className="bg-sky-400 h-full rounded-full transition-all duration-500" style={{ width: `${(rataRataMapelPendukung / 100) * 100}%` }} />
@@ -759,21 +802,21 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
 
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-slate-400">Indeks Sekolah ({indeksSekolahScore})</span>
-                  <span className="font-bold text-indigo-300">{Math.round((indeksSekolahScore / 100) * 150)} / 150</span>
+                  <span className="text-slate-400">3. Penyesuaian Indeks Sekolah</span>
+                  <span className="font-bold text-indigo-300">{indeksSekolahScore}% Akreditasi/Alumni</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-indigo-400 h-full rounded-full transition-all duration-500" style={{ width: `${(indeksSekolahScore / 100) * 100}%` }} />
+                  <div className="bg-indigo-400 h-full rounded-full transition-all duration-500" style={{ width: `${indeksSekolahScore}%` }} />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-slate-400">Bonus Prestasi & Trend</span>
-                  <span className="font-bold text-amber-300">+{bonusPrestasiScore + trendRapor} Poin</span>
+                  <span className="text-slate-400">4. Bonus Prestasi & Trend Nilai</span>
+                  <span className="font-bold text-amber-300">+{bonusPrestasiScore + trendRapor} Poin Bonus</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-amber-400 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, bonusPrestasiScore + trendRapor)}%` }} />
+                  <div className="bg-amber-400 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (bonusPrestasiScore + trendRapor) * 10)}%` }} />
                 </div>
               </div>
             </div>

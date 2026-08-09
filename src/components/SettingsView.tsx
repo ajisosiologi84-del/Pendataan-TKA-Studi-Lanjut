@@ -1667,6 +1667,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       { key: 'canImportData', label: 'Impor Spreadsheet & Batch Data', desc: 'Izin mengunggah berkas Excel untuk tambah massal' },
                       { key: 'canManageLaptops', label: 'Kelola Pendataan Laptop & Proktor', desc: 'Akses modul cek fisik laptop & teknisi laboratorium' },
                       { key: 'canAccessBanPt', label: 'Akses Direktori Akreditasi BAN-PT', desc: 'Pencarian akreditasi kampus & prodi resmi' },
+                      { key: 'canAccessSnbpCalc', label: 'Simulasi Kalkulator Rasionalisasi SNBP 2026', desc: 'Akses modul perhitungan estimasi skor & peluang kelolosan SNBP' },
                       { key: 'canManageUsers', label: 'Kelola Akun Pengguna Khusus', desc: 'Tambah/Edit/Hapus akun guru & wali kelas' },
                       { key: 'canManageSettings', label: 'Pengaturan Kop Surat & Sistem', desc: 'Ubah identitas sekolah, tanda tangan & password' },
                       { key: 'canViewAuditLogs', label: 'Lihat Audit Log Keamanan', desc: 'Memantau catatan riwayat aktivitas pengguna' },

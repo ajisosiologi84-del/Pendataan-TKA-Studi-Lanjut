@@ -112,6 +112,7 @@ export interface RolePermissions {
   canManageSettings: boolean;
   canViewAuditLogs: boolean;
   canAccessBanPt: boolean;
+  canAccessSnbpCalc: boolean;
   canManageUsers: boolean;
   canResetDatabase: boolean;
 }
