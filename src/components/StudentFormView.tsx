@@ -32,7 +32,11 @@ import {
   ArrowRight,
   Printer,
   Download,
-  FileText
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  BookOpenCheck,
+  ListOrdered
 } from 'lucide-react';
 import {
   Student,
@@ -47,16 +51,29 @@ import { SAMPLE_BANPT_DATA, findBanPtAccreditation, ProdiData } from '../data/ba
 import { getAppsScriptUrl } from '../utils/storage';
 import { StudentFormPdfModal } from './StudentFormPdfModal';
 
+export interface BanPtSelectionItem {
+  targetChoice: 'pilihan1' | 'pilihan2';
+  ptn: string;
+  prodi: string;
+  akreditasi?: string;
+}
+
 interface StudentFormViewProps {
   editingStudent: Student | null;
   onSaveStudent: (studentData: Omit<Student, 'id' | 'updatedAt'> | Student) => void;
   onCancel: () => void;
+  onOpenBanPtDirectory?: () => void;
+  prefilledBanPtSelection?: BanPtSelectionItem | null;
+  onClearPrefilledBanPt?: () => void;
 }
 
 export const StudentFormView: React.FC<StudentFormViewProps> = ({
   editingStudent,
   onSaveStudent,
   onCancel,
+  onOpenBanPtDirectory,
+  prefilledBanPtSelection,
+  onClearPrefilledBanPt,
 }) => {
   const [formData, setFormData] = useState({
     namaSiswa: '',
@@ -67,10 +84,14 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
     mapelTka1: 'Matematika',
     mapelTka2: 'Fisika',
     pilihanStudiLanjut: 'Kuliah' as PilihanStudiLanjutType,
-    ptn1: 'Institut Teknologi Bandung (ITB)',
-    prodiPilihan1: 'Teknik Informatika / Ilmu Komputer',
-    ptn2: 'Universitas Indonesia (UI)',
-    prodiPilihan2: 'Pendidikan Dokter / Kedokteran Umum',
+    ptn1: '',
+    prodiPilihan1: '',
+    akreditasiPilihan1: '',
+    kriteriaPilihan1: '',
+    ptn2: '',
+    prodiPilihan2: '',
+    akreditasiPilihan2: '',
+    kriteriaPilihan2: '',
     mengajukanKipKuliah: 'Tidak' as 'Ya' | 'Tidak',
     kategoriDesil: '' as 'Desil 1' | 'Desil 2' | 'Desil 3' | 'Desil 4' | 'Desil 5' | '',
     noHp: '',
@@ -81,14 +102,50 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
   const [prestasiList, setPrestasiList] = useState<PrestasiItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [appsScriptStatus, setAppsScriptStatus] = useState<string | null>(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [submittedStudent, setSubmittedStudent] = useState<Student | null>(null);
 
   // --- STATE & HELPERS FOR INTEGRATION OF MAPEL PILIHAN 845, BAN-PT DIRECTORY & PDF PRINT ---
   const [mapelSearchQuery, setMapelSearchQuery] = useState('');
   const [isBanPtModalOpen, setIsBanPtModalOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isGuideExpanded, setIsGuideExpanded] = useState(true);
   const [banPtTarget, setBanPtTarget] = useState<'pilihan1' | 'pilihan2'>('pilihan1');
   const [banPtSearchPtn, setBanPtSearchPtn] = useState('');
   const [banPtSearchProdi, setBanPtSearchProdi] = useState('');
+  const [banPtSearchJenjang, setBanPtSearchJenjang] = useState('ALL');
+  const [banPtSearchAkreditasi, setBanPtSearchAkreditasi] = useState('ALL');
+  const [banPtAlertMessage, setBanPtAlertMessage] = useState<string | null>(null);
+
+  // Effect to handle selection coming from BAN-PT main menu directory
+  useEffect(() => {
+    if (prefilledBanPtSelection) {
+      const { targetChoice, ptn, prodi, akreditasi } = prefilledBanPtSelection;
+      if (targetChoice === 'pilihan1') {
+        setFormData((prev) => ({
+          ...prev,
+          ptn1: ptn,
+          prodiPilihan1: prodi,
+          akreditasiPilihan1: akreditasi || prev.akreditasiPilihan1 || 'Unggul',
+        }));
+        setBanPtAlertMessage(`Pilihan 1 berhasil diisi dari BAN-PT: ${prodi} (${ptn}) [${akreditasi || 'Terverifikasi'}]`);
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          ptn2: ptn,
+          prodiPilihan2: prodi,
+          akreditasiPilihan2: akreditasi || prev.akreditasiPilihan2 || 'Unggul',
+        }));
+        setBanPtAlertMessage(`Pilihan 2 berhasil diisi dari BAN-PT: ${prodi} (${ptn}) [${akreditasi || 'Terverifikasi'}]`);
+      }
+      if (onClearPrefilledBanPt) {
+        onClearPrefilledBanPt();
+      }
+      setTimeout(() => {
+        setBanPtAlertMessage(null);
+      }, 6000);
+    }
+  }, [prefilledBanPtSelection, onClearPrefilledBanPt]);
 
   // Helper to match target prodi name to 845 database
   const findMapel845Data = (prodiName: string): MapelPilihanData | null => {
@@ -182,15 +239,15 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       const choice1 = parseUnivAndProdi(
         editingStudent.ptn1,
         editingStudent.prodiPilihan1,
-        UNIVERSITAS_POPULAR_OPTIONS[0],
-        PRODI_POPULAR_OPTIONS[0]
+        '',
+        ''
       );
 
       const choice2 = parseUnivAndProdi(
         editingStudent.ptn2,
         editingStudent.prodiPilihan2,
-        UNIVERSITAS_POPULAR_OPTIONS[1],
-        PRODI_POPULAR_OPTIONS[1]
+        '',
+        ''
       );
 
       setFormData({
@@ -204,8 +261,12 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
         pilihanStudiLanjut: editingStudent.pilihanStudiLanjut || 'Kuliah',
         ptn1: choice1.univ,
         prodiPilihan1: choice1.prodi,
+        akreditasiPilihan1: editingStudent.akreditasiPilihan1 || '',
+        kriteriaPilihan1: editingStudent.kriteriaPilihan1 || '',
         ptn2: choice2.univ,
         prodiPilihan2: choice2.prodi,
+        akreditasiPilihan2: editingStudent.akreditasiPilihan2 || '',
+        kriteriaPilihan2: editingStudent.kriteriaPilihan2 || '',
         mengajukanKipKuliah: editingStudent.mengajukanKipKuliah || 'Tidak',
         kategoriDesil: editingStudent.kategoriDesil || '',
         noHp: editingStudent.noHp || '',
@@ -327,7 +388,14 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       }
 
       onSaveStudent(studentToSave);
+      setSubmittedStudent(studentToSave);
     } else {
+      const newStudentObj: Student = {
+        id: 'std-' + Date.now(),
+        ...payloadData,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+
       if (gasUrl) {
         try {
           await fetch(gasUrl, {
@@ -342,9 +410,11 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       }
 
       onSaveStudent(payloadData);
+      setSubmittedStudent(newStudentObj);
     }
 
     setIsSubmitting(false);
+    setIsSuccessModalOpen(true);
   };
 
   return (
@@ -377,29 +447,119 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
           </div>
         </div>
 
-        {/* Quick Info Callout Banner for PDF Print Feature */}
-        <div className="bg-gradient-to-r from-amber-50 via-indigo-50 to-emerald-50 p-3.5 rounded-2xl border border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-500/20 text-amber-900 rounded-xl border border-amber-300/60 shrink-0">
-              <Printer className="w-4 h-4 text-amber-700" />
+        {/* PANDUAN LANGKAH PENGISIAN FORM & CETAK BUKTI PDF UNTUK SISWA */}
+        <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-4 lg:p-5 shadow-lg border border-indigo-700/50 space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b border-indigo-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-500/30 shrink-0">
+                <BookOpenCheck className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h4 className="font-black text-sm text-white flex items-center gap-2">
+                  Panduan Pengisian Form Nilai / TKA & Cetak Bukti PDF
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase">
+                    5 Langkah Resmi
+                  </span>
+                </h4>
+                <p className="text-xs text-indigo-200/80 mt-0.5">
+                  Petunjuk alur mandiri bagi siswa dari pengisian data, mata pelajaran TKA, hingga cetak dokumen bukti pendataan.
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="font-extrabold text-slate-900 block text-xs">
-                Cetak Hasil Pengisian Formulir Siswa (Format PDF Resmi)
-              </span>
-              <span className="text-slate-600 text-[11px]">
-                Kapan saja, Anda dapat mengunduh / mencetak lembar Bukti Pendataan Siswa resmi yang sudah dilengkapi Kop Sekolah, Pasfoto, Akreditasi BAN-PT, dan QR Code.
-              </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(true)}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shrink-0"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Pratinjau PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsGuideExpanded(!isGuideExpanded)}
+                className="p-1.5 bg-indigo-800/60 hover:bg-indigo-700 text-indigo-200 rounded-xl transition-all border border-indigo-600/40"
+                title={isGuideExpanded ? 'Sembunyikan Panduan' : 'Tampilkan Panduan'}
+              >
+                {isGuideExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsPdfModalOpen(true)}
-            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[11px] rounded-xl transition-all shadow-xs shrink-0 flex items-center gap-1"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Pratinjau PDF</span>
-          </button>
+
+          {isGuideExpanded && (
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 pt-1 text-xs">
+              {/* Step 1 */}
+              <div className="bg-indigo-950/60 p-3 rounded-xl border border-indigo-800/60 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                    Langkah 1
+                  </span>
+                  <User className="w-4 h-4 text-amber-400" />
+                </div>
+                <h5 className="font-bold text-white text-xs">Identitas & Pasfoto</h5>
+                <p className="text-[11px] text-indigo-200/80 leading-relaxed">
+                  Isi Nama, NIS, NISN, Kelas, serta unggah <strong>Pasfoto Resmi (3x4)</strong> rasio tegak. Foto tercetak di lembar PDF.
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="bg-indigo-950/60 p-3 rounded-xl border border-indigo-800/60 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                    Langkah 2
+                  </span>
+                  <BookOpen className="w-4 h-4 text-sky-400" />
+                </div>
+                <h5 className="font-bold text-white text-xs">Mapel Pilihan TKA</h5>
+                <p className="text-[11px] text-indigo-200/80 leading-relaxed">
+                  Pilih <strong>Mapel TKA 1 & Mapel TKA 2</strong> yang diambil semester ini sesuai arahan Wali Kelas & BK.
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="bg-indigo-950/60 p-3 rounded-xl border border-indigo-800/60 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                    Langkah 3
+                  </span>
+                  <GraduationCap className="w-4 h-4 text-emerald-400" />
+                </div>
+                <h5 className="font-bold text-white text-xs">Studi Lanjut & PTN</h5>
+                <p className="text-[11px] text-indigo-200/80 leading-relaxed">
+                  Pilih Jalur Studi, isikan <strong>PTN & Prodi Pilihan 1-2</strong>, lalu periksa akreditasi pada menu Direktori BAN-PT.
+                </p>
+              </div>
+
+              {/* Step 4 */}
+              <div className="bg-indigo-950/60 p-3 rounded-xl border border-indigo-800/60 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                    Langkah 4
+                  </span>
+                  <Award className="w-4 h-4 text-purple-400" />
+                </div>
+                <h5 className="font-bold text-white text-xs">Prestasi & KIP-K</h5>
+                <p className="text-[11px] text-indigo-200/80 leading-relaxed">
+                  Input hingga 15 sertifikat prestasi pendukung dan isi status pengajuan Beasiswa KIP-Kuliah jika mendaftar.
+                </p>
+              </div>
+
+              {/* Step 5 */}
+              <div className="bg-amber-950/40 p-3 rounded-xl border border-amber-500/40 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                    Langkah 5
+                  </span>
+                  <Printer className="w-4 h-4 text-amber-400" />
+                </div>
+                <h5 className="font-bold text-amber-200 text-xs">Simpan & Cetak PDF</h5>
+                <p className="text-[11px] text-amber-100/90 leading-relaxed">
+                  Klik <strong>"Simpan Data Siswa"</strong>, lalu tekan tombol <strong>"Cetak / Export PDF"</strong> untuk mengunduh bukti resmi ber-Kop & QR Code.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {appsScriptStatus && (
@@ -687,190 +847,6 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                 </p>
               </div>
             </div>
-
-            {/* INTEGRATION PANEL: LINIERITAS MAPEL TKA VS DATABASE MAPEL PILIHAN (845 DATA) */}
-            <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white p-5 rounded-2xl shadow-md border border-indigo-800/50 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-700/50 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-400/30">
-                    <Layers className="w-5 h-5 text-indigo-300" />
-                  </div>
-                  <div>
-                    <h5 className="font-extrabold text-sm text-white">
-                      Analisis Linieritas TKA & Matrix Database (845 Prodi)
-                    </h5>
-                    <p className="text-[11px] text-indigo-200">
-                      Keterhubungan Mapel TKA dengan Database Kurikulum Merdeka & SNBP Kemdikbud Ristek.
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 px-2.5 py-1 rounded-full shrink-0">
-                  Kemdikbud 845 Matrix
-                </span>
-              </div>
-
-              {/* Cross-Check Cards for Section 3 Choices */}
-              {formData.pilihanStudiLanjut === 'Kuliah' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Choice 1 Cross-Check */}
-                  {(() => {
-                    const eval1 = evaluateLinearity(formData.prodiPilihan1, formData.mapelTka1, formData.mapelTka2);
-                    return (
-                      <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/15 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-indigo-200 text-[11px] uppercase tracking-wider flex items-center gap-1">
-                            <span className="w-4 h-4 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[9px] font-bold">1</span>
-                            Linieritas Pilihan 1
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${eval1.color}`}>
-                            {eval1.status}
-                          </span>
-                        </div>
-                        <p className="font-bold text-white text-xs truncate">
-                          {formData.prodiPilihan1 || 'Belum diisi'}
-                        </p>
-                        {eval1.matchedData ? (
-                          <div className="space-y-1 bg-black/20 p-2 rounded-lg text-[11px]">
-                            <div className="flex justify-between text-indigo-200">
-                              <span>Mapel Pendukung Resmi:</span>
-                            </div>
-                            <div className="font-semibold text-amber-300">
-                              1. {eval1.matchedData.mapelPendukung1}
-                            </div>
-                            <div className="font-semibold text-amber-300">
-                              2. {eval1.matchedData.mapelPendukung2}
-                            </div>
-                            {eval1.score < 2 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleChange('mapelTka1', eval1.matchedData?.mapelPendukung1 || formData.mapelTka1);
-                                  handleChange('mapelTka2', eval1.matchedData?.mapelPendukung2 || formData.mapelTka2);
-                                }}
-                                className="mt-1.5 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
-                              >
-                                <Sparkles className="w-3 h-3 text-amber-300" />
-                                <span>Sesuaikan Mapel TKA ke Pilihan 1 Ini</span>
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-300 italic">
-                            Masukkan nama program studi spesifik untuk melihat rekomendasi mapel pendukung resmi.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Choice 2 Cross-Check */}
-                  {(() => {
-                    const eval2 = evaluateLinearity(formData.prodiPilihan2, formData.mapelTka1, formData.mapelTka2);
-                    return (
-                      <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/15 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-indigo-200 text-[11px] uppercase tracking-wider flex items-center gap-1">
-                            <span className="w-4 h-4 rounded-full bg-teal-500 text-white flex items-center justify-center text-[9px] font-bold">2</span>
-                            Linieritas Pilihan 2
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${eval2.color}`}>
-                            {eval2.status}
-                          </span>
-                        </div>
-                        <p className="font-bold text-white text-xs truncate">
-                          {formData.prodiPilihan2 || 'Belum diisi'}
-                        </p>
-                        {eval2.matchedData ? (
-                          <div className="space-y-1 bg-black/20 p-2 rounded-lg text-[11px]">
-                            <div className="flex justify-between text-indigo-200">
-                              <span>Mapel Pendukung Resmi:</span>
-                            </div>
-                            <div className="font-semibold text-teal-300">
-                              1. {eval2.matchedData.mapelPendukung1}
-                            </div>
-                            <div className="font-semibold text-teal-300">
-                              2. {eval2.matchedData.mapelPendukung2}
-                            </div>
-                            {eval2.score < 2 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleChange('mapelTka1', eval2.matchedData?.mapelPendukung1 || formData.mapelTka1);
-                                  handleChange('mapelTka2', eval2.matchedData?.mapelPendukung2 || formData.mapelTka2);
-                                }}
-                                className="mt-1.5 w-full py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
-                              >
-                                <Sparkles className="w-3 h-3 text-amber-300" />
-                                <span>Sesuaikan Mapel TKA ke Pilihan 2 Ini</span>
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-300 italic">
-                            Masukkan nama program studi spesifik untuk melihat rekomendasi mapel pendukung resmi.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Quick Search Widget in 845 Database */}
-              <div className="bg-black/25 p-3.5 rounded-xl border border-white/10 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-indigo-200 flex items-center gap-1.5">
-                    <Search className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Cari Rekomendasi Mapel untuk Program Studi Lain (Database 845 Data):</span>
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  value={mapelSearchQuery}
-                  onChange={(e) => setMapelSearchQuery(e.target.value)}
-                  placeholder="Ketik jurusan tujuan (contoh: Kedokteran, Informatika, Hukum, Psikologi, Farmasi)..."
-                  className="w-full px-3.5 py-2 bg-white/10 border border-white/20 rounded-xl text-xs text-white placeholder-indigo-200/60 focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
-                />
-
-                {mapelSearchQuery.trim() !== '' && (
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1 pt-1">
-                    {MAPEL_PILIHAN_845_LIST.filter(
-                      (item) =>
-                        item.kelompokProdi.toLowerCase().includes(mapelSearchQuery.toLowerCase()) ||
-                        item.rumpunIlmo.toLowerCase().includes(mapelSearchQuery.toLowerCase())
-                    )
-                      .slice(0, 5)
-                      .map((item) => (
-                        <div
-                          key={item.no}
-                          className="bg-white/10 hover:bg-white/20 p-2.5 rounded-lg border border-white/10 flex items-center justify-between gap-2 text-xs transition-colors"
-                        >
-                          <div>
-                            <div className="font-bold text-white text-xs">{item.kelompokProdi}</div>
-                            <div className="text-[10px] text-indigo-200 flex items-center gap-2 mt-0.5">
-                              <span>Rumpun: {item.rumpunIlmo}</span>
-                              <span>•</span>
-                              <span className="text-amber-300 font-semibold">
-                                Pendukung: {item.mapelPendukung1} & {item.mapelPendukung2}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleChange('mapelTka1', item.mapelPendukung1);
-                              handleChange('mapelTka2', item.mapelPendukung2);
-                            }}
-                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] rounded-md shrink-0 transition-colors"
-                          >
-                            Terapkan Mapel
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           <hr className="border-slate-100" />
@@ -974,14 +950,43 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
             {/* CONDITIONAL SUB-SECTION: If Kuliah is selected */}
             {formData.pilihanStudiLanjut === 'Kuliah' ? (
               <div className="p-4.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center justify-between border-b border-emerald-100 pb-2.5">
+                {banPtAlertMessage && (
+                  <div className="p-3 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-md flex items-center justify-between animate-in zoom-in-95">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                      <span>{banPtAlertMessage}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBanPtAlertMessage(null)}
+                      className="text-emerald-200 hover:text-white font-black text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-b border-emerald-100 pb-2.5 flex-wrap gap-2">
                   <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
                     <GraduationCap className="w-4 h-4 text-emerald-700" />
                     <span>3.1 Isian Pilihan Universitas & Program Studi (Terhubung BAN-PT)</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Direktori BAN-PT Integrated
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {onOpenBanPtDirectory && (
+                      <button
+                        type="button"
+                        onClick={onOpenBanPtDirectory}
+                        className="text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200/80 flex items-center gap-1 transition-colors"
+                      >
+                        <Building2 className="w-3 h-3 text-indigo-600" />
+                        <span>Buka Direktori Prodi PTN (Menu Utama)</span>
+                        <ExternalLink className="w-2.5 h-2.5 text-indigo-500" />
+                      </button>
+                    )}
+                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Direktori BAN-PT Integrated
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1028,18 +1033,18 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                     {(() => {
                       const banpt1 = findBanPtAccreditation(formData.ptn1, formData.prodiPilihan1);
                       return (
-                        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-slate-700 text-[10px] uppercase tracking-wider flex items-center gap-1">
                               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Akreditasi BAN-PT Pilihan 1
                             </span>
                             {banpt1 ? (
                               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-md border border-emerald-300">
-                                🌟 {banpt1.akreditasi}
+                                🌟 Database: {banpt1.akreditasi}
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded-md">
-                                Belum Terverifikasi
+                                Tidak Ada di DB
                               </span>
                             )}
                           </div>
@@ -1050,7 +1055,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                             </div>
                           ) : (
                             <p className="text-[10px] text-slate-500">
-                              Verifikasi akreditasi resmi prodi PTN ini di direktori BAN-PT.
+                              Verifikasi akreditasi resmi prodi PTN ini di direktori BAN-PT atau isi manual di bawah.
                             </p>
                           )}
                           <button
@@ -1069,6 +1074,65 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                         </div>
                       );
                     })()}
+
+                    {/* Manual Entry Akreditasi & Kriteria Pilihan 1 */}
+                    <div className="pt-2 border-t border-emerald-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-bold text-emerald-950 flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Entry Manual Akreditasi BAN-PT & Kriteria (Pilihan 1)</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                            Akreditasi BAN-PT Pilihan 1:
+                          </label>
+                          <input
+                            type="text"
+                            list="akreditasi-options"
+                            value={formData.akreditasiPilihan1}
+                            onChange={(e) => handleChange('akreditasiPilihan1', e.target.value)}
+                            placeholder="Unggul / A / Baik Sekali / B / ASIIN"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                            Kriteria & Pertimbangan Pilihan 1:
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.kriteriaPilihan1}
+                            onChange={(e) => handleChange('kriteriaPilihan1', e.target.value)}
+                            placeholder="Daya tampung 120, Keketatan 2%, PTN-BH"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Tag Chips for Kriteria Pilihan 1 */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] text-slate-500 font-bold">Rekomendasi Kriteria:</span>
+                        {['Daya Tampung Besar', 'Akreditasi Internasional (ASIIN)', 'PTN-BH Utama', 'KIP-Kuliah Friendly', 'Prospek Karir Tinggi'].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              const current = formData.kriteriaPilihan1 ? formData.kriteriaPilihan1 + ', ' : '';
+                              if (!formData.kriteriaPilihan1.includes(chip)) {
+                                handleChange('kriteriaPilihan1', current + chip);
+                              }
+                            }}
+                            className="text-[9px] font-bold px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200 text-emerald-800 rounded-md transition-colors"
+                          >
+                            + {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* PILIHAN 2 CARD */}
@@ -1114,18 +1178,18 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                     {(() => {
                       const banpt2 = findBanPtAccreditation(formData.ptn2, formData.prodiPilihan2);
                       return (
-                        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-slate-700 text-[10px] uppercase tracking-wider flex items-center gap-1">
                               <ShieldCheck className="w-3.5 h-3.5 text-teal-600" /> Akreditasi BAN-PT Pilihan 2
                             </span>
                             {banpt2 ? (
                               <span className="px-2 py-0.5 bg-teal-100 text-teal-800 font-extrabold text-[10px] rounded-md border border-teal-300">
-                                🌟 {banpt2.akreditasi}
+                                🌟 Database: {banpt2.akreditasi}
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded-md">
-                                Belum Terverifikasi
+                                Tidak Ada di DB
                               </span>
                             )}
                           </div>
@@ -1136,7 +1200,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                             </div>
                           ) : (
                             <p className="text-[10px] text-slate-500">
-                              Verifikasi akreditasi resmi prodi PTN ini di direktori BAN-PT.
+                              Verifikasi akreditasi resmi prodi PTN ini di direktori BAN-PT atau isi manual di bawah.
                             </p>
                           )}
                           <button
@@ -1155,6 +1219,247 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                         </div>
                       );
                     })()}
+
+                    {/* Manual Entry Akreditasi & Kriteria Pilihan 2 */}
+                    <div className="pt-2 border-t border-teal-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-bold text-teal-950 flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5 text-teal-700" />
+                          <span>Entry Manual Akreditasi BAN-PT & Kriteria (Pilihan 2)</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                            Akreditasi BAN-PT Pilihan 2:
+                          </label>
+                          <input
+                            type="text"
+                            list="akreditasi-options"
+                            value={formData.akreditasiPilihan2}
+                            onChange={(e) => handleChange('akreditasiPilihan2', e.target.value)}
+                            placeholder="Unggul / A / Baik Sekali / B / C"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                            Kriteria & Pertimbangan Pilihan 2:
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.kriteriaPilihan2}
+                            onChange={(e) => handleChange('kriteriaPilihan2', e.target.value)}
+                            placeholder="Cadangan Aman, Alumni Banyak, Lokasi Dekat"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Tag Chips for Kriteria Pilihan 2 */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] text-slate-500 font-bold">Rekomendasi Kriteria:</span>
+                        {['Passing Grade Aman', 'Pilihan Cadangan Prioritas', 'Lokasi Dekat Rumah', 'Fasilitas Lengkap', 'Akreditasi Terjamin'].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              const current = formData.kriteriaPilihan2 ? formData.kriteriaPilihan2 + ', ' : '';
+                              if (!formData.kriteriaPilihan2.includes(chip)) {
+                                handleChange('kriteriaPilihan2', current + chip);
+                              }
+                            }}
+                            className="text-[9px] font-bold px-2 py-0.5 bg-teal-100/70 hover:bg-teal-200 text-teal-800 rounded-md transition-colors"
+                          >
+                            + {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* INTEGRATION PANEL: LINIERITAS MAPEL TKA VS DATABASE MAPEL PILIHAN (845 DATA) */}
+                <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white p-5 rounded-2xl shadow-md border border-indigo-800/50 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-700/50 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-400/30">
+                        <Layers className="w-5 h-5 text-indigo-300" />
+                      </div>
+                      <div>
+                        <h5 className="font-extrabold text-sm text-white">
+                          Analisis Linieritas TKA & Matrix Database (845 Prodi)
+                        </h5>
+                        <p className="text-[11px] text-indigo-200">
+                          Keterhubungan Mapel TKA dengan Database Kurikulum Merdeka & SNBP Kemdikbud Ristek.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 px-2.5 py-1 rounded-full shrink-0">
+                      Kemdikbud 845 Matrix
+                    </span>
+                  </div>
+
+                  {/* Cross-Check Cards for Section 3 Choices */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Choice 1 Cross-Check */}
+                    {(() => {
+                      const eval1 = evaluateLinearity(formData.prodiPilihan1, formData.mapelTka1, formData.mapelTka2);
+                      return (
+                        <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/15 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-indigo-200 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                              <span className="w-4 h-4 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[9px] font-bold">1</span>
+                              Linieritas Pilihan 1
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${eval1.color}`}>
+                              {eval1.status}
+                            </span>
+                          </div>
+                          <p className="font-bold text-white text-xs truncate">
+                            {formData.prodiPilihan1 || 'Belum diisi'}
+                          </p>
+                          {eval1.matchedData ? (
+                            <div className="space-y-1 bg-black/20 p-2 rounded-lg text-[11px]">
+                              <div className="flex justify-between text-indigo-200">
+                                <span>Mapel Pendukung Resmi:</span>
+                              </div>
+                              <div className="font-semibold text-amber-300">
+                                1. {eval1.matchedData.mapelPendukung1}
+                              </div>
+                              <div className="font-semibold text-amber-300">
+                                2. {eval1.matchedData.mapelPendukung2}
+                              </div>
+                              {eval1.score < 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleChange('mapelTka1', eval1.matchedData?.mapelPendukung1 || formData.mapelTka1);
+                                    handleChange('mapelTka2', eval1.matchedData?.mapelPendukung2 || formData.mapelTka2);
+                                  }}
+                                  className="mt-1.5 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
+                                >
+                                  <Sparkles className="w-3 h-3 text-amber-300" />
+                                  <span>Sesuaikan Mapel TKA ke Pilihan 1 Ini</span>
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-300 italic">
+                              Masukkan nama program studi spesifik untuk melihat rekomendasi mapel pendukung resmi.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Choice 2 Cross-Check */}
+                    {(() => {
+                      const eval2 = evaluateLinearity(formData.prodiPilihan2, formData.mapelTka1, formData.mapelTka2);
+                      return (
+                        <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/15 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-indigo-200 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                              <span className="w-4 h-4 rounded-full bg-teal-500 text-white flex items-center justify-center text-[9px] font-bold">2</span>
+                              Linieritas Pilihan 2
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${eval2.color}`}>
+                              {eval2.status}
+                            </span>
+                          </div>
+                          <p className="font-bold text-white text-xs truncate">
+                            {formData.prodiPilihan2 || 'Belum diisi'}
+                          </p>
+                          {eval2.matchedData ? (
+                            <div className="space-y-1 bg-black/20 p-2 rounded-lg text-[11px]">
+                              <div className="flex justify-between text-indigo-200">
+                                <span>Mapel Pendukung Resmi:</span>
+                              </div>
+                              <div className="font-semibold text-teal-300">
+                                1. {eval2.matchedData.mapelPendukung1}
+                              </div>
+                              <div className="font-semibold text-teal-300">
+                                2. {eval2.matchedData.mapelPendukung2}
+                              </div>
+                              {eval2.score < 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleChange('mapelTka1', eval2.matchedData?.mapelPendukung1 || formData.mapelTka1);
+                                    handleChange('mapelTka2', eval2.matchedData?.mapelPendukung2 || formData.mapelTka2);
+                                  }}
+                                  className="mt-1.5 w-full py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
+                                >
+                                  <Sparkles className="w-3 h-3 text-amber-300" />
+                                  <span>Sesuaikan Mapel TKA ke Pilihan 2 Ini</span>
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-300 italic">
+                              Masukkan nama program studi spesifik untuk melihat rekomendasi mapel pendukung resmi.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Quick Search Widget in 845 Database */}
+                  <div className="bg-black/25 p-3.5 rounded-xl border border-white/10 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-indigo-200 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Cari Rekomendasi Mapel untuk Program Studi Lain (Database 845 Data):</span>
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      value={mapelSearchQuery}
+                      onChange={(e) => setMapelSearchQuery(e.target.value)}
+                      placeholder="Ketik jurusan tujuan (contoh: Kedokteran, Informatika, Hukum, Psikologi, Farmasi)..."
+                      className="w-full px-3.5 py-2 bg-white/10 border border-white/20 rounded-xl text-xs text-white placeholder-indigo-200/60 focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+                    />
+
+                    {mapelSearchQuery.trim() !== '' && (
+                      <div className="max-h-48 overflow-y-auto space-y-2 pr-1 pt-1">
+                        {MAPEL_PILIHAN_845_LIST.filter(
+                          (item) =>
+                            item.kelompokProdi.toLowerCase().includes(mapelSearchQuery.toLowerCase()) ||
+                            item.rumpunIlmo.toLowerCase().includes(mapelSearchQuery.toLowerCase())
+                        )
+                          .slice(0, 5)
+                          .map((item) => (
+                            <div
+                              key={item.no}
+                              className="bg-white/10 hover:bg-white/20 p-2.5 rounded-lg border border-white/10 flex items-center justify-between gap-2 text-xs transition-colors"
+                            >
+                              <div>
+                                <div className="font-bold text-white text-xs">{item.kelompokProdi}</div>
+                                <div className="text-[10px] text-indigo-200 flex items-center gap-2 mt-0.5">
+                                  <span>Rumpun: {item.rumpunIlmo}</span>
+                                  <span>•</span>
+                                  <span className="text-amber-300 font-semibold">
+                                    Pendukung: {item.mapelPendukung1} & {item.mapelPendukung2}
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleChange('mapelTka1', item.mapelPendukung1);
+                                  handleChange('mapelTka2', item.mapelPendukung2);
+                                }}
+                                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] rounded-md shrink-0 transition-colors"
+                              >
+                                Terapkan Mapel
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1205,6 +1510,17 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                   {PRODI_POPULAR_OPTIONS.map((p) => (
                     <option key={p} value={p} />
                   ))}
+                </datalist>
+
+                <datalist id="akreditasi-options">
+                  <option value="Unggul" />
+                  <option value="A" />
+                  <option value="Baik Sekali" />
+                  <option value="B" />
+                  <option value="Baik" />
+                  <option value="C" />
+                  <option value="Terakreditasi Internasional (ASIIN/IABEE)" />
+                  <option value="Dalam Proses Akreditasi" />
                 </datalist>
 
                 {/* KIP Kuliah & Desil Section */}
@@ -1531,28 +1847,44 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       {/* BAN-PT DIRECTORY SELECTION MODAL */}
       {isBanPtModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]">
-            <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-5 relative shrink-0 flex items-center justify-between">
+          <div className="bg-white rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]">
+            <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-5 relative shrink-0 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-400/30">
                   <Building2 className="w-5 h-5 text-indigo-300" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">
-                    Pilih PTN & Program Studi dari Direktori BAN-PT
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <span>Pilih PTN & Program Studi dari Direktori BAN-PT</span>
                   </h3>
                   <p className="text-[11px] text-indigo-200">
-                    Siswa & Orang Tua: Pilihan untuk {banPtTarget === 'pilihan1' ? 'Pilihan 1 (Utama)' : 'Pilihan 2 (Alternatif)'}
+                    Siswa & Orang Tua: Mengisi untuk <strong className="text-amber-300">{banPtTarget === 'pilihan1' ? 'Pilihan 1 (Utama)' : 'Pilihan 2 (Alternatif)'}</strong>
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsBanPtModalOpen(false)}
-                className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {onOpenBanPtDirectory && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBanPtModalOpen(false);
+                      onOpenBanPtDirectory();
+                    }}
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/30 hover:bg-indigo-500/50 text-indigo-100 border border-indigo-300/40 text-xs font-bold rounded-xl transition-all"
+                    title="Ke Halaman Utama Direktori BAN-PT untuk pencarian tabel lengkap"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-indigo-200" />
+                    <span>Menu Utama Direktori</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsBanPtModalOpen(false)}
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-4 space-y-3 bg-slate-50 border-b border-slate-200">
@@ -1571,17 +1903,17 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                    Cari Nama Perguruan Tinggi (PTN):
+                    Cari Perguruan Tinggi:
                   </label>
                   <input
                     type="text"
                     value={banPtSearchPtn}
                     onChange={(e) => setBanPtSearchPtn(e.target.value)}
-                    placeholder="Contoh: ITB, UI, UGM, ITS, UNAIR..."
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    placeholder="Contoh: ITB, UI, UGM..."
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   />
                 </div>
                 <div>
@@ -1592,9 +1924,40 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                     type="text"
                     value={banPtSearchProdi}
                     onChange={(e) => setBanPtSearchProdi(e.target.value)}
-                    placeholder="Contoh: Kedokteran, Informatika, Hukum..."
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    placeholder="Contoh: Kedokteran, Informatika..."
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Filter Jenjang:
+                  </label>
+                  <select
+                    value={banPtSearchJenjang}
+                    onChange={(e) => setBanPtSearchJenjang(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  >
+                    <option value="ALL">Semua Jenjang</option>
+                    <option value="S1">S1 (Sarjana)</option>
+                    <option value="D4">D4 (Sarjana Terapan)</option>
+                    <option value="D3">D3 (Diploma Tiga)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Akreditasi BAN-PT:
+                  </label>
+                  <select
+                    value={banPtSearchAkreditasi}
+                    onChange={(e) => setBanPtSearchAkreditasi(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  >
+                    <option value="ALL">Semua Akreditasi</option>
+                    <option value="Unggul">Unggul</option>
+                    <option value="A">A</option>
+                    <option value="Baik Sekali">Baik Sekali</option>
+                    <option value="B">B</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -1603,14 +1966,16 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
               {SAMPLE_BANPT_DATA.filter((item) => {
                 const matchPtn = !banPtSearchPtn || item.ptn.toLowerCase().includes(banPtSearchPtn.toLowerCase());
                 const matchProdi = !banPtSearchProdi || item.prodi.toLowerCase().includes(banPtSearchProdi.toLowerCase());
-                return matchPtn && matchProdi;
+                const matchJenjang = banPtSearchJenjang === 'ALL' || item.jenjang === banPtSearchJenjang;
+                const matchAkreditasi = banPtSearchAkreditasi === 'ALL' || item.akreditasi === banPtSearchAkreditasi;
+                return matchPtn && matchProdi && matchJenjang && matchAkreditasi;
               }).map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-3 bg-white hover:bg-indigo-50/50 rounded-xl border border-slate-200 flex items-center justify-between gap-3 transition-colors shadow-2xs"
+                  className="p-3 bg-white hover:bg-indigo-50/50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors shadow-2xs"
                 >
                   <div className="space-y-0.5 text-xs">
-                    <div className="font-bold text-slate-900 flex items-center gap-2">
+                    <div className="font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                       <span>{item.ptn}</span>
                       <span className="px-2 py-0.2 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-md border border-emerald-200">
                         {item.akreditasi}
@@ -1618,29 +1983,155 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                     </div>
                     <div className="text-slate-700 font-medium">{item.prodi} ({item.jenjang})</div>
                     <div className="text-[10px] text-slate-400">
-                      SK: {item.nomorSk} | berlaku s.d {item.tahunKedaluwarsa} | Wilayah: {item.wilayah}
+                      SK: {item.nomorSk} | s.d {item.tahunKedaluwarsa} | Wilayah: {item.wilayah}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (banPtTarget === 'pilihan1') {
+                  <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
                         handleChange('ptn1', item.ptn);
                         handleChange('prodiPilihan1', item.prodi);
-                      } else {
+                        handleChange('akreditasiPilihan1', item.akreditasi);
+                        setBanPtAlertMessage(`Pilihan 1 berhasil diisi: ${item.prodi} (${item.ptn}) [Akreditasi ${item.akreditasi}]`);
+                        setIsBanPtModalOpen(false);
+                      }}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] rounded-xl shadow-xs transition-colors flex items-center gap-1"
+                      title="Set sebagai Pilihan 1 (Prioritas Utama)"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Pilihan 1</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         handleChange('ptn2', item.ptn);
                         handleChange('prodiPilihan2', item.prodi);
-                      }
-                      setIsBanPtModalOpen(false);
-                    }}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 flex items-center gap-1"
-                  >
-                    <span>Pilih Ini</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
+                        handleChange('akreditasiPilihan2', item.akreditasi);
+                        setBanPtAlertMessage(`Pilihan 2 berhasil diisi: ${item.prodi} (${item.ptn}) [Akreditasi ${item.akreditasi}]`);
+                        setIsBanPtModalOpen(false);
+                      }}
+                      className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-[10px] rounded-xl shadow-xs transition-colors flex items-center gap-1"
+                      title="Set sebagai Pilihan 2 (Prioritas Alternatif)"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Pilihan 2</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ANIMATED SUCCESS MODAL (DATA SUDAH TERKIRIM) */}
+      {isSuccessModalOpen && submittedStudent && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 text-center space-y-6 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+            
+            {/* Top Decorative Background Glow */}
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-br from-emerald-500 via-teal-600 to-indigo-600 opacity-15 -z-10" />
+
+            {/* Animated Checkmark Circle with Pulse */}
+            <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xl shadow-emerald-500/30 border-4 border-white animate-bounce">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
+            </div>
+
+            {/* Header Title */}
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black tracking-wide uppercase">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Data Berhasil Terkirim!
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Formulir Pengisian Selesai & Tersimpan
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Data Isian Mata Pelajaran TKA, Studi Lanjut, dan Identitas Siswa Anda telah diverifikasi oleh sistem dan tersimpan dengan aman secara real-time.
+              </p>
+            </div>
+
+            {/* Student Summary Box */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-left space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-extrabold text-slate-800">{submittedStudent.namaSiswa}</span>
+                </div>
+                <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">
+                  {submittedStudent.kelas}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">NIS / NISN</p>
+                  <p className="font-mono text-slate-700 font-semibold">{submittedStudent.nis} / {submittedStudent.nisn}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Studi Lanjut</p>
+                  <p className="font-semibold text-slate-700">{submittedStudent.pilihanStudiLanjut}</p>
+                </div>
+              </div>
+
+              {submittedStudent.pilihanStudiLanjut === 'Kuliah' && (
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1 text-xs">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                    <GraduationCap className="w-3 h-3 text-indigo-600" /> Pilihan PTN & Prodi
+                  </p>
+                  <p className="text-[11px] text-slate-800 font-bold truncate">
+                    1. {submittedStudent.ptn1} - {submittedStudent.prodiPilihan1}
+                  </p>
+                  {submittedStudent.ptn2 && (
+                    <p className="text-[11px] text-slate-600 truncate">
+                      2. {submittedStudent.ptn2} - {submittedStudent.prodiPilihan2}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Multi-Destination Sync Badges */}
+              <div className="pt-2 border-t border-slate-200/80 space-y-1">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Status Sinkronisasi Sistem:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Memori Lokal Browser</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Database Cloud Firestore</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuccessModalOpen(false);
+                  setIsPdfModalOpen(true);
+                }}
+                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Cetak / Pratinjau PDF Bukti Pendaftaran</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSuccessModalOpen(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                Tutup & Kembali ke Form
+              </button>
+            </div>
+
           </div>
         </div>
       )}

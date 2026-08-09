@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Plus, Download, RefreshCw, FileText } from 'lucide-react';
+import { Menu, Plus, Download, RefreshCw, Database } from 'lucide-react';
 import { NavigationTab, Student } from '../types';
 import { exportStudentsToCSV } from '../utils/storage';
 
@@ -80,9 +80,14 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div>
-          <h2 className="text-lg lg:text-xl font-bold text-slate-800 tracking-tight">
-            {title}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg lg:text-xl font-bold text-slate-800 tracking-tight">
+              {title}
+            </h2>
+            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Terhubung ke Firebase Firestore Cloud Database">
+              <Database className="w-3 h-3 text-amber-600" /> Firebase Cloud Active
+            </span>
+          </div>
           <p className="text-xs text-slate-500 hidden sm:block">
             {subtitle}
           </p>

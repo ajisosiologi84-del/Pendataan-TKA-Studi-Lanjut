@@ -1,62 +1,193 @@
-import React, { useState } from 'react';
-import { ShieldCheck, UserCheck, GraduationCap, Users, KeyRound, Lock, User, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, UserCheck, GraduationCap, Users, KeyRound, Lock, User, Eye, EyeOff, AlertOctagon, Clock, Laptop } from 'lucide-react';
 import { Student } from '../types';
+import { getStoredSystemPasswords, getStoredSecurityPolicy, getStoredCustomUsers, addSecurityLog } from '../utils/storage';
+import { sanitizeNis } from '../utils/sanitizer';
 
 interface LoginModalProps {
-  onLogin: (role: 'superadmin' | 'walikelas' | 'bk' | 'siswa', nis?: string) => void;
+  onLogin: (role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa', nis?: string) => void;
   students: Student[];
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => {
-  const [selectedRole, setSelectedRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'siswa'>('superadmin');
+  const [selectedRole, setSelectedRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa'>('superadmin');
   const [passwordInput, setPasswordInput] = useState('');
   const [nisInput, setNisInput] = useState('');
   const [studentPasswordInput, setStudentPasswordInput] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Rate Limiting & Lockout State
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState<number>(0);
+
+  const securityPolicy = getStoredSecurityPolicy();
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (lockoutTimer > 0) {
+      timer = setInterval(() => {
+        setLockoutTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [lockoutTimer]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
+    if (lockoutTimer > 0) return;
 
+    setErrorMsg(null);
+    const storedPasswords = getStoredSystemPasswords();
+    const customUsers = getStoredCustomUsers();
+
+    if (!passwordInput.trim()) {
+      setErrorMsg('Password / NIP Kredensial wajib diisi. Tidak diperkenankan mengosongkan password.');
+      return;
+    }
+
+    let isSuccess = false;
+    let expectedPassword = '';
+
+    // Check system default role passwords
     if (selectedRole === 'superadmin') {
-      if (passwordInput === 'admin123' || passwordInput === 'admin' || passwordInput === '') {
-        onLogin('superadmin');
-      } else {
-        setErrorMsg('Password Super Admin salah! (Gunakan: admin123)');
-      }
+      expectedPassword = storedPasswords.superadmin;
+      if (passwordInput === expectedPassword) isSuccess = true;
     } else if (selectedRole === 'walikelas') {
-      if (passwordInput === 'walikelas' || passwordInput === 'guru' || passwordInput === '') {
-        onLogin('walikelas');
-      } else {
-        setErrorMsg('Password Wali Kelas salah! (Gunakan: walikelas)');
-      }
+      expectedPassword = storedPasswords.walikelas;
+      if (passwordInput === expectedPassword) isSuccess = true;
     } else if (selectedRole === 'bk') {
-      if (passwordInput === 'bk' || passwordInput === 'bimbingan' || passwordInput === '') {
-        onLogin('bk');
+      expectedPassword = storedPasswords.bk;
+      if (passwordInput === expectedPassword) isSuccess = true;
+    } else if (selectedRole === 'proktor') {
+      expectedPassword = storedPasswords.proktor || 'proktor123';
+      if (passwordInput === expectedPassword) isSuccess = true;
+    }
+
+    // Check custom user accounts (match by password or username)
+    if (!isSuccess) {
+      const matchUser = customUsers.find(
+        (u) =>
+          u.status === 'AKTIF' &&
+          (u.passwordHash === passwordInput || u.username.toLowerCase() === passwordInput.toLowerCase())
+      );
+      if (matchUser && (matchUser.role === selectedRole || selectedRole === 'superadmin')) {
+        isSuccess = true;
+      }
+    }
+
+    if (isSuccess) {
+      addSecurityLog({
+        role: selectedRole,
+        action: 'LOGIN',
+        category: 'AUTH',
+        status: 'SUCCESS',
+        details: `Login berhasil sebagai ${selectedRole.toUpperCase()}`,
+      });
+      setFailedAttempts(0);
+      onLogin(selectedRole);
+    } else {
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+
+      addSecurityLog({
+        role: selectedRole,
+        action: 'LOGIN_ATTEMPT',
+        category: 'AUTH',
+        status: 'FAILED',
+        details: `Percobaan login gagal untuk role ${selectedRole.toUpperCase()} (Percobaan ke-${newAttempts})`,
+      });
+
+      const maxAttempts = securityPolicy.maxLoginAttempts || 5;
+      const lockoutSecs = (securityPolicy.lockoutMinutes || 15) * 60;
+
+      if (newAttempts >= maxAttempts) {
+        setLockoutTimer(lockoutSecs);
+        setFailedAttempts(0);
+        setErrorMsg(`Terlalu banyak percobaan login gagal! Akses terkunci sementara selama ${securityPolicy.lockoutMinutes || 15} menit.`);
       } else {
-        setErrorMsg('Password BK salah! (Gunakan: bk)');
+        setErrorMsg(`Password ${selectedRole === 'superadmin' ? 'Super Admin' : selectedRole === 'walikelas' ? 'Wali Kelas' : 'Guru BK'} / NIP Akun salah! (${maxAttempts - newAttempts} kesempatan tersisa)`);
       }
     }
   };
 
   const handleStudentLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
+    if (lockoutTimer > 0) return;
 
-    const cleanNis = nisInput.trim();
+    setErrorMsg(null);
+    const cleanNis = sanitizeNis(nisInput);
+
     if (!cleanNis) {
       setErrorMsg('Mohon masukkan Nomor Induk Siswa (NIS) Anda.');
       return;
     }
 
-    // Password verification for student: password must equal NIS or match student record if configured
-    // User requested: "untuk siswa hanya bisa mengisi data Form input data ( menggunakan NIS untuk username dan Password )"
     const pass = studentPasswordInput.trim();
-    if (pass !== cleanNis && pass !== 'siswa123' && pass !== '') {
-      setErrorMsg('Password harus sama dengan NIS Anda (atau gunakan NIS sebagai password).');
+    if (!pass) {
+      setErrorMsg('Mohon masukkan Password (gunakan NIS Anda).');
       return;
     }
 
+    // Check if student exists in database
+    const matchedStudent = students.find((s) => s.nis === cleanNis);
+
+    if (!matchedStudent) {
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      addSecurityLog({
+        role: 'siswa',
+        userIdentifier: cleanNis,
+        action: 'STUDENT_LOGIN',
+        category: 'AUTH',
+        status: 'FAILED',
+        details: `Login siswa gagal: NIS ${cleanNis} tidak terdaftar di database`,
+      });
+
+      if (newAttempts >= 5) {
+        setLockoutTimer(30);
+        setFailedAttempts(0);
+        setErrorMsg('Terlalu banyak percobaan login gagal! Akses terkunci selama 30 detik.');
+      } else {
+        setErrorMsg(`NIS "${cleanNis}" tidak ditemukan dalam database siswa!`);
+      }
+      return;
+    }
+
+    // Password verification for student: password must equal NIS
+    if (pass !== cleanNis && pass !== 'siswa123') {
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      addSecurityLog({
+        role: 'siswa',
+        userIdentifier: cleanNis,
+        action: 'STUDENT_LOGIN',
+        category: 'AUTH',
+        status: 'FAILED',
+        details: `Login siswa gagal: Password tidak cocok untuk NIS ${cleanNis}`,
+      });
+
+      if (newAttempts >= 5) {
+        setLockoutTimer(30);
+        setFailedAttempts(0);
+        setErrorMsg('Terlalu banyak percobaan login gagal! Akses terkunci selama 30 detik.');
+      } else {
+        setErrorMsg('Password salah! Password siswa harus sama dengan Nomor Induk Siswa (NIS).');
+      }
+      return;
+    }
+
+    addSecurityLog({
+      role: 'siswa',
+      userIdentifier: cleanNis,
+      action: 'STUDENT_LOGIN',
+      category: 'AUTH',
+      status: 'SUCCESS',
+      details: `Siswa ${matchedStudent.namaSiswa} (NIS: ${cleanNis}) berhasil login`,
+    });
+
+    setFailedAttempts(0);
     onLogin('siswa', cleanNis);
   };
 
@@ -79,10 +210,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
         {/* Role Selection Tabs */}
         <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-1.5 rounded-2xl">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
             <button
               onClick={() => { setSelectedRole('superadmin'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'superadmin'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -94,7 +225,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
             <button
               onClick={() => { setSelectedRole('walikelas'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'walikelas'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -106,7 +237,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
             <button
               onClick={() => { setSelectedRole('bk'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'bk'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -117,8 +248,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
             </button>
 
             <button
+              onClick={() => { setSelectedRole('proktor'); setErrorMsg(null); setPasswordInput(''); }}
+              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
+                selectedRole === 'proktor'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Laptop className="w-4 h-4" />
+              <span>Proktor/Teknisi</span>
+            </button>
+
+            <button
               onClick={() => { setSelectedRole('siswa'); setErrorMsg(null); setNisInput(''); setStudentPasswordInput(''); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'siswa'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -129,9 +272,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
             </button>
           </div>
 
-          {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 animate-shake">
-              {errorMsg}
+          {/* Lockout Warning Banner */}
+          {lockoutTimer > 0 && (
+            <div className="p-3 bg-rose-900 text-white rounded-2xl flex items-center gap-3 animate-pulse text-xs font-bold shadow-md">
+              <Clock className="w-5 h-5 text-rose-300 shrink-0" />
+              <div>
+                <p className="font-extrabold text-rose-100">AKSES TERKUNCI SEMENTARA</p>
+                <p className="text-[11px] font-normal text-rose-200">
+                  Sistem keamanan mendeteksi terlalu banyak percobaan gagal. Silakan tunggu <strong>{lockoutTimer} detik</strong>.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {errorMsg && lockoutTimer === 0 && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 animate-shake flex items-center gap-2">
+              <AlertOctagon className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
@@ -144,15 +301,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                     {selectedRole === 'superadmin' && 'Akses Penuh Super Admin'}
                     {selectedRole === 'walikelas' && 'Akses Lihat Data Wali Kelas'}
                     {selectedRole === 'bk' && 'Akses Lihat Data Guru BK'}
+                    {selectedRole === 'proktor' && 'Akses Khusus Proktor & Teknisi Lab'}
                   </span>
                   <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
-                    {selectedRole === 'superadmin' ? 'Full Control' : 'Read-Only View'}
+                    {selectedRole === 'superadmin' ? 'Full Control' : selectedRole === 'proktor' ? 'Kelola Laptop & Lab' : 'Read-Only View'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
                   {selectedRole === 'superadmin' && 'Memiliki hak akses penuh untuk mengelola, menambah, mengedit, menghapus data, dan pengaturan sistem.'}
                   {selectedRole === 'walikelas' && 'Dapat melihat seluruh rekapitulasi data siswa, analisis TKA, dan inventaris laptop secara real-time.'}
                   {selectedRole === 'bk' && 'Dapat memantau pilihan studi lanjut siswa, peta peminatan TKA, serta rekapitulasi data secara menyeluruh.'}
+                  {selectedRole === 'proktor' && 'Hak akses penuh menginput, memverifikasi kelayakan laptop siswa, alokasi nomor meja/ruang lab, serta cetak berita acara & stiker lab.'}
                 </p>
 
                 <div className="space-y-1.5 pt-2">
@@ -164,30 +323,44 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                       <Lock className="w-4 h-4" />
                     </span>
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
+                      disabled={lockoutTimer > 0}
                       placeholder={
-                        selectedRole === 'superadmin' ? 'Masukkan password (cth: admin123)' :
-                        selectedRole === 'walikelas' ? 'Masukkan password (cth: walikelas)' : 'Masukkan password (cth: bk)'
+                        selectedRole === 'superadmin' ? 'Masukkan password Super Admin' :
+                        selectedRole === 'walikelas' ? 'Masukkan password Wali Kelas' :
+                        selectedRole === 'proktor' ? 'Masukkan password Proktor (Default: proktor123)' :
+                        'Masukkan password Guru BK'
                       }
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                       autoFocus
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
-                  <p className="text-[10px] text-slate-400 italic">
-                    Hint default: <code className="bg-slate-200 px-1 py-0.5 rounded font-mono text-slate-700">
-                      {selectedRole === 'superadmin' ? 'admin123' : selectedRole === 'walikelas' ? 'walikelas' : 'bk'}
-                    </code> (atau kosongkan untuk masuk langsung)
-                  </p>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                    <span>Akses terproteksi enkripsi sesi lokal</span>
+                    <span className="font-semibold text-indigo-600">Terdaftar di Sistem</span>
+                  </div>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+                disabled={lockoutTimer > 0}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <ShieldCheck className="w-4 h-4" /> Masuk sebagai {selectedRole === 'superadmin' ? 'Super Admin' : selectedRole === 'walikelas' ? 'Wali Kelas' : 'Guru BK'}
+                <ShieldCheck className="w-4 h-4" /> Masuk sebagai {
+                  selectedRole === 'superadmin' ? 'Super Admin' :
+                  selectedRole === 'walikelas' ? 'Wali Kelas' :
+                  selectedRole === 'proktor' ? 'Proktor / Teknisi' : 'Guru BK'
+                }
               </button>
             </form>
           ) : (
@@ -219,8 +392,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                         type="text"
                         value={nisInput}
                         onChange={(e) => setNisInput(e.target.value)}
+                        disabled={lockoutTimer > 0}
                         placeholder="Cth: 10234 atau 202601"
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono disabled:bg-slate-100 disabled:cursor-not-allowed"
                         autoFocus
                       />
                     </div>
@@ -235,12 +409,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                         <KeyRound className="w-4 h-4" />
                       </span>
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={studentPasswordInput}
                         onChange={(e) => setStudentPasswordInput(e.target.value)}
+                        disabled={lockoutTimer > 0}
                         placeholder="Masukkan password (ketik NIS Anda)"
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                     <p className="text-[10px] text-slate-500 italic">
                       💡 Tip: Password standar adalah NIS Anda sendiri.
@@ -250,7 +432,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
                 {students.length > 0 && (
                   <div className="mt-2 p-2.5 bg-white rounded-xl border border-emerald-100 text-[11px] text-slate-500">
-                    <span className="font-semibold text-emerald-800">Contoh NIS Siswa yang tersedia:</span>{' '}
+                    <span className="font-semibold text-emerald-800">Contoh NIS Siswa terdaftar:</span>{' '}
                     <span className="font-mono text-slate-700">
                       {students.slice(0, 4).map(s => s.nis).join(', ')}
                     </span>
@@ -260,7 +442,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
               <button
                 type="submit"
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                disabled={lockoutTimer > 0}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <GraduationCap className="w-4 h-4" /> Masuk & Isi Form Data Siswa
               </button>

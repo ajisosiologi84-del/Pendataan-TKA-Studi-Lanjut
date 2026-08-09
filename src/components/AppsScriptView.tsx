@@ -98,8 +98,38 @@ export const AppsScriptView: React.FC = () => {
           Pusat Integrasi & Generator Google Sheets Backend
         </h3>
         <p className="text-slate-300 text-xs lg:text-sm leading-relaxed">
-          Seluruh data administrasi siswa (Nama, NIS, NISN, Mapel TKA 1-2, dan Prodi 1-2) dirancang untuk sinkron secara otomatis dengan Google Spreadsheet Anda menggunakan Google Apps Script tanpa memerlukan database server berbayar.
+          Seluruh data administrasi siswa (Nama, NIS, NISN, Mapel TKA 1-2, dan Prodi 1-2), Pendataan Laptop & Sarana Ujian TKA, serta Proktor/Teknisi Lab dirancang untuk sinkron secara otomatis dengan Google Spreadsheet Anda menggunakan Google Apps Script tanpa memerlukan database server berbayar.
         </p>
+
+        {/* Multi-Tab Cards Info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 space-y-1">
+            <div className="flex items-center gap-2 text-indigo-300 font-bold text-xs">
+              <FileSpreadsheet className="w-4 h-4 text-indigo-400" /> Tab 1: Data_Siswa_TKA
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Menyimpan Identitas, Mapel TKA 1-2, Pilihan PTN/Prodi, KIP-K & Prestasi.
+            </p>
+          </div>
+
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 space-y-1">
+            <div className="flex items-center gap-2 text-teal-300 font-bold text-xs">
+              <FileSpreadsheet className="w-4 h-4 text-teal-400" /> Tab 2: Pendataan_Laptop_Sarana
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Menyimpan Merk Laptop, Charger, Kode Lab, No Meja & Status Kelayakan.
+            </p>
+          </div>
+
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 space-y-1">
+            <div className="flex items-center gap-2 text-sky-300 font-bold text-xs">
+              <FileSpreadsheet className="w-4 h-4 text-sky-400" /> Tab 3: Proktor_Teknisi_Lab
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Menyimpan Penugasan Proktor Ujian, Teknisi Lab & Alokasi Ruang Test.
+            </p>
+          </div>
+        </div>
 
         <div className="flex flex-wrap gap-3 pt-2">
           <button

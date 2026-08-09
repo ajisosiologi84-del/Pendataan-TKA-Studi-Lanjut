@@ -1,4 +1,20 @@
-import { Student, LaptopData, ProktorTeknisi, DocumentSettings } from '../types';
+import {
+  Student,
+  LaptopData,
+  ProktorTeknisi,
+  DocumentSettings,
+  RolePermissions,
+  CustomUserAccount,
+  SystemSecurityPolicy,
+  ActiveUserSession
+} from '../types';
+import {
+  syncStudentToFirestore,
+  deleteStudentFromFirestore,
+  syncLaptopToFirestore,
+  syncSecurityLogToFirestore,
+  syncSystemSettingsToFirestore
+} from '../firebase';
 import { INITIAL_STUDENTS } from '../data/mockStudents';
 import { INITIAL_LAPTOPS } from '../data/mockLaptops';
 
@@ -79,6 +95,7 @@ export function addStudent(data: Omit<Student, 'id' | 'updatedAt'>): Student {
   };
   const updatedList = [newStudent, ...students];
   saveStudents(updatedList);
+  syncStudentToFirestore(newStudent);
   return newStudent;
 }
 
@@ -91,6 +108,7 @@ export function updateStudent(updated: Student): void {
       updatedAt: new Date().toISOString().split('T')[0],
     };
     saveStudents(students);
+    syncStudentToFirestore(students[index]);
   }
 }
 
@@ -98,6 +116,7 @@ export function deleteStudent(id: string): void {
   const students = getStoredStudents();
   const filtered = students.filter((s) => s.id !== id);
   saveStudents(filtered);
+  deleteStudentFromFirestore(id);
 }
 
 export function addMultipleStudents(
@@ -401,6 +420,335 @@ export function saveLiveSheetsAccess(isOpen: boolean): void {
     console.error('Error saving live sheets access setting:', error);
   }
 }
+
+/* ==========================================================================
+   SYSTEM PASSWORDS & SECURITY AUDIT LOG HELPERS
+   ========================================================================== */
+
+const SYSTEM_PASSWORDS_KEY = 'tka_system_passwords_v1';
+const SECURITY_LOGS_KEY = 'tka_security_logs_v1';
+
+export interface SystemPasswords {
+  superadmin: string;
+  walikelas: string;
+  bk: string;
+  proktor: string;
+}
+
+export const DEFAULT_SYSTEM_PASSWORDS: SystemPasswords = {
+  superadmin: 'admin123',
+  walikelas: 'walikelas',
+  bk: 'bk',
+  proktor: 'proktor123',
+};
+
+export function getStoredSystemPasswords(): SystemPasswords {
+  try {
+    const raw = localStorage.getItem(SYSTEM_PASSWORDS_KEY);
+    if (!raw) {
+      localStorage.setItem(SYSTEM_PASSWORDS_KEY, JSON.stringify(DEFAULT_SYSTEM_PASSWORDS));
+      return DEFAULT_SYSTEM_PASSWORDS;
+    }
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_SYSTEM_PASSWORDS, ...parsed };
+  } catch (error) {
+    console.error('Error reading system passwords:', error);
+    return DEFAULT_SYSTEM_PASSWORDS;
+  }
+}
+
+export function saveSystemPasswords(passwords: SystemPasswords): void {
+  try {
+    localStorage.setItem(SYSTEM_PASSWORDS_KEY, JSON.stringify(passwords));
+    syncSystemSettingsToFirestore('passwords', passwords);
+  } catch (error) {
+    console.error('Error saving system passwords:', error);
+  }
+}
+
+export interface SecurityLog {
+  id: string;
+  timestamp: string;
+  role: string;
+  userIdentifier?: string;
+  action: string;
+  category: 'AUTH' | 'DATA_CHANGE' | 'SETTINGS' | 'SYSTEM';
+  status: 'SUCCESS' | 'FAILED' | 'WARNING';
+  details: string;
+}
+
+export function getStoredSecurityLogs(): SecurityLog[] {
+  try {
+    const raw = localStorage.getItem(SECURITY_LOGS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Error reading security logs:', error);
+    return [];
+  }
+}
+
+export function addSecurityLog(logData: Omit<SecurityLog, 'id' | 'timestamp'>): SecurityLog {
+  const existing = getStoredSecurityLogs();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }) + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const newLog: SecurityLog = {
+    ...logData,
+    id: 'log-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    timestamp: dateStr,
+  };
+
+  // Keep last 300 logs to optimize memory
+  const updated = [newLog, ...existing].slice(0, 300);
+  try {
+    localStorage.setItem(SECURITY_LOGS_KEY, JSON.stringify(updated));
+    syncSecurityLogToFirestore(newLog);
+  } catch (err) {
+    console.error('Error saving security log:', err);
+  }
+  return newLog;
+}
+
+export function clearSecurityLogs(): void {
+  try {
+    localStorage.removeItem(SECURITY_LOGS_KEY);
+  } catch (err) {
+    console.error('Error clearing security logs:', err);
+  }
+}
+
+/* ==========================================================================
+   ADVANCED ROLE PERMISSIONS MATRIX & SECURITY POLICIES
+   ========================================================================== */
+
+const ACCESS_MATRIX_KEY = 'tka_access_matrix_v2';
+const SECURITY_POLICY_KEY = 'tka_security_policy_v2';
+const CUSTOM_USERS_KEY = 'tka_custom_users_v2';
+const ACTIVE_SESSIONS_KEY = 'tka_active_sessions_v2';
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissions> = {
+  superadmin: {
+    canEditStudent: true,
+    canDeleteStudent: true,
+    canExportData: true,
+    canImportData: true,
+    canManageLaptops: true,
+    canManageSettings: true,
+    canViewAuditLogs: true,
+    canAccessBanPt: true,
+    canManageUsers: true,
+    canResetDatabase: true,
+  },
+  walikelas: {
+    canEditStudent: false,
+    canDeleteStudent: false,
+    canExportData: true,
+    canImportData: false,
+    canManageLaptops: false,
+    canManageSettings: false,
+    canViewAuditLogs: false,
+    canAccessBanPt: true,
+    canManageUsers: false,
+    canResetDatabase: false,
+  },
+  bk: {
+    canEditStudent: true,
+    canDeleteStudent: false,
+    canExportData: true,
+    canImportData: false,
+    canManageLaptops: false,
+    canManageSettings: false,
+    canViewAuditLogs: false,
+    canAccessBanPt: true,
+    canManageUsers: false,
+    canResetDatabase: false,
+  },
+  panitia: {
+    canEditStudent: true,
+    canDeleteStudent: false,
+    canExportData: true,
+    canImportData: true,
+    canManageLaptops: true,
+    canManageSettings: false,
+    canViewAuditLogs: false,
+    canAccessBanPt: false,
+    canManageUsers: false,
+    canResetDatabase: false,
+  },
+  read_only: {
+    canEditStudent: false,
+    canDeleteStudent: false,
+    canExportData: true,
+    canImportData: false,
+    canManageLaptops: false,
+    canManageSettings: false,
+    canViewAuditLogs: false,
+    canAccessBanPt: true,
+    canManageUsers: false,
+    canResetDatabase: false,
+  },
+};
+
+export const DEFAULT_SECURITY_POLICY: SystemSecurityPolicy = {
+  minPasswordLength: 8,
+  requireNumbers: true,
+  requireSpecialChar: true,
+  requireUppercase: true,
+  maxLoginAttempts: 5,
+  lockoutMinutes: 15,
+  sessionTimeoutMinutes: 15,
+  enableTwoFactorPin: true,
+  securityPin: '123456',
+  forcePasswordPeriodDays: 90,
+};
+
+export const DEFAULT_CUSTOM_USERS: CustomUserAccount[] = [
+  {
+    id: 'usr-admin-1',
+    username: 'admin.utama',
+    fullName: 'Drs. H. Mulyono, M.Pd (Super Administrator)',
+    role: 'superadmin',
+    passwordHash: 'Admin#2026!',
+    status: 'AKTIF',
+    kelasAkses: 'ALL',
+    createdAt: '2026-01-10',
+    lastLogin: '2026-08-08 19:30'
+  },
+  {
+    id: 'usr-wali-1',
+    username: '198503122010011002',
+    fullName: 'Budi Santoso, S.Pd (Wali XII MIPA 1)',
+    role: 'walikelas',
+    passwordHash: 'WaliKelas#123',
+    status: 'AKTIF',
+    kelasAkses: 'XII MIPA 1',
+    createdAt: '2026-01-15',
+    lastLogin: '2026-08-07 14:20'
+  },
+  {
+    id: 'usr-bk-1',
+    username: '197908222005012001',
+    fullName: 'Siti Aminah, M.Psi (Guru Bimbingan Konseling)',
+    role: 'bk',
+    passwordHash: 'GuruBK#2026',
+    status: 'AKTIF',
+    kelasAkses: 'ALL',
+    createdAt: '2026-01-15',
+    lastLogin: '2026-08-08 09:15'
+  },
+];
+
+export function getStoredRolePermissions(): Record<string, RolePermissions> {
+  try {
+    const raw = localStorage.getItem(ACCESS_MATRIX_KEY);
+    if (!raw) {
+      localStorage.setItem(ACCESS_MATRIX_KEY, JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
+      return DEFAULT_ROLE_PERMISSIONS;
+    }
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error('Error reading role permissions:', error);
+    return DEFAULT_ROLE_PERMISSIONS;
+  }
+}
+
+export function saveRolePermissions(matrix: Record<string, RolePermissions>): void {
+  try {
+    localStorage.setItem(ACCESS_MATRIX_KEY, JSON.stringify(matrix));
+    syncSystemSettingsToFirestore('rolePermissions', matrix);
+  } catch (error) {
+    console.error('Error saving role permissions:', error);
+  }
+}
+
+export function getStoredSecurityPolicy(): SystemSecurityPolicy {
+  try {
+    const raw = localStorage.getItem(SECURITY_POLICY_KEY);
+    if (!raw) {
+      localStorage.setItem(SECURITY_POLICY_KEY, JSON.stringify(DEFAULT_SECURITY_POLICY));
+      return DEFAULT_SECURITY_POLICY;
+    }
+    return { ...DEFAULT_SECURITY_POLICY, ...JSON.parse(raw) };
+  } catch (error) {
+    console.error('Error reading security policy:', error);
+    return DEFAULT_SECURITY_POLICY;
+  }
+}
+
+export function saveSecurityPolicy(policy: SystemSecurityPolicy): void {
+  try {
+    localStorage.setItem(SECURITY_POLICY_KEY, JSON.stringify(policy));
+    syncSystemSettingsToFirestore('securityPolicy', policy);
+  } catch (error) {
+    console.error('Error saving security policy:', error);
+  }
+}
+
+export function getStoredCustomUsers(): CustomUserAccount[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_USERS_KEY);
+    if (!raw) {
+      localStorage.setItem(CUSTOM_USERS_KEY, JSON.stringify(DEFAULT_CUSTOM_USERS));
+      return DEFAULT_CUSTOM_USERS;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : DEFAULT_CUSTOM_USERS;
+  } catch (error) {
+    console.error('Error reading custom users:', error);
+    return DEFAULT_CUSTOM_USERS;
+  }
+}
+
+export function saveCustomUsers(users: CustomUserAccount[]): void {
+  try {
+    localStorage.setItem(CUSTOM_USERS_KEY, JSON.stringify(users));
+    syncSystemSettingsToFirestore('customUsers', users);
+  } catch (error) {
+    console.error('Error saving custom users:', error);
+  }
+}
+
+export function getStoredActiveSessions(): ActiveUserSession[] {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SESSIONS_KEY);
+    if (!raw) {
+      const initialSession: ActiveUserSession = {
+        sessionId: 'sess-' + Date.now(),
+        username: 'admin.utama',
+        role: 'Super Admin',
+        deviceInfo: 'Chrome / macOS (Sesi Aktif Ini)',
+        ipAddress: '180.252.112.44',
+        loginTime: new Date().toLocaleString('id-ID'),
+        lastActive: 'Baru saja',
+        isCurrent: true,
+      };
+      localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify([initialSession]));
+      return [initialSession];
+    }
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error('Error reading active sessions:', error);
+    return [];
+  }
+}
+
+export function clearActiveSessionsExceptCurrent(): void {
+  try {
+    const sessions = getStoredActiveSessions();
+    const currentOnly = sessions.filter((s) => s.isCurrent);
+    localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(currentOnly));
+  } catch (error) {
+    console.error('Error clearing sessions:', error);
+  }
+}
+
+
 
 
 

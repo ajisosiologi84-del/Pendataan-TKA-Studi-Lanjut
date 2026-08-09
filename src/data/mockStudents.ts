@@ -81,8 +81,12 @@ export const INITIAL_STUDENTS: Student[] = [
     pilihanStudiLanjut: 'Kuliah',
     ptn1: 'Institut Teknologi Bandung (ITB)',
     prodiPilihan1: 'Teknik Informatika',
+    akreditasiPilihan1: 'Unggul (ASIIN)',
+    kriteriaPilihan1: 'Keketatan SNBP 2%, Akreditasi Internasional ASIIN, PTN-BH Utama',
     ptn2: 'Institut Teknologi Sepuluh Nopember (ITS)',
     prodiPilihan2: 'Teknik Informatika',
+    akreditasiPilihan2: 'Unggul',
+    kriteriaPilihan2: 'Daya Tampung 120, Pilihan Cadangan Prioritas',
     noHp: '081234567890',
     fotoSiswa: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256',
     prestasiList: [
@@ -287,132 +291,426 @@ export const INITIAL_STUDENTS: Student[] = [
 ];
 
 export const GOOGLE_APPS_SCRIPT_CODE = `/**
- * Google Apps Script Backend - Administrasi Pendataan TKA & Studi Lanjut
+ * Google Apps Script Backend - Administrasi Pendataan TKA & Studi Lanjut + Sarana Ujian Laptop (Lengkap)
  * Salin kode ini ke Google Apps Script (Extensions > Apps Script di Google Sheets Anda)
  * Lalu Deploy sebagai Web App dengan Akses: "Anyone" (Siapa Saja)
  */
 
-const SHEET_NAME = "Data_Siswa_TKA";
+const SHEET_STUDENTS = "Data_Siswa_TKA";
+const SHEET_LAPTOPS = "Pendataan_Laptop_Sarana";
+const SHEET_PROKTOR = "Proktor_Teknisi_Lab";
 
-function setupSheet() {
+/**
+ * Otomatis membuat & memformat 3 Sheet Tab Utama di Google Sheets:
+ * 1. Data_Siswa_TKA
+ * 2. Pendataan_Laptop_Sarana
+ * 3. Proktor_Teknisi_Lab
+ */
+function setupAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
+  
+  // 1. Sheet Data Siswa TKA
+  let sheetStudents = ss.getSheetByName(SHEET_STUDENTS);
+  if (!sheetStudents) {
+    sheetStudents = ss.insertSheet(SHEET_STUDENTS);
   }
-  
-  const headers = [
-    "ID", "Nama Siswa", "NIS", "NISN", "Kelas", "Jenis Kelamin",
-    "Mapel TKA 1", "Mapel TKA 2", "Prodi Pilihan 1", "Prodi Pilihan 2",
-    "No HP", "Catatan", "Waktu Diperbarui"
+  const headersStudents = [
+    "ID",
+    "Nama Siswa",
+    "NIS",
+    "NISN",
+    "Kelas",
+    "Jenis Kelamin",
+    "No HP / WA",
+    "Pasfoto Siswa (URL/Base64)",
+    "Mapel TKA 1",
+    "Mapel TKA 2",
+    "Pilihan Studi Lanjut",
+    "Universitas / Perguruan Tinggi Pilihan 1",
+    "Prodi Pilihan 1",
+    "Akreditasi Prodi 1",
+    "Linieritas TKA Prodi 1",
+    "Universitas / Perguruan Tinggi Pilihan 2",
+    "Prodi Pilihan 2",
+    "Akreditasi Prodi 2",
+    "Linieritas TKA Prodi 2",
+    "Mengajukan KIP-K",
+    "Kategori Desil",
+    "Jumlah Prestasi",
+    "Detail Prestasi Siswa (JSON)",
+    "Catatan",
+    "Waktu Diperbarui"
   ];
-  
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-    const headerRange = sheet.getRange(1, 1, 1, headers.length);
-    headerRange.setBackground("#1e293b")
+  if (sheetStudents.getLastRow() === 0) {
+    sheetStudents.appendRow(headersStudents);
+    sheetStudents.getRange(1, 1, 1, headersStudents.length)
+                 .setBackground("#1e293b")
+                 .setFontColor("#ffffff")
+                 .setFontWeight("bold")
+                 .setHorizontalAlignment("center");
+    sheetStudents.setFrozenRows(1);
+  }
+
+  // 2. Sheet Pendataan Laptop & Sarana Ujian TKA
+  let sheetLaptops = ss.getSheetByName(SHEET_LAPTOPS);
+  if (!sheetLaptops) {
+    sheetLaptops = ss.insertSheet(SHEET_LAPTOPS);
+  }
+  const headersLaptops = [
+    "ID Laptop / Inventaris",
+    "ID Siswa",
+    "Nama Siswa / Pemilik",
+    "Kelas",
+    "Gelombang Ujian",
+    "Merk / Tipe Laptop",
+    "Kelengkapan Charger",
+    "Kelengkapan Mouse",
+    "Kelengkapan Keyboard",
+    "Kode Ruang Lab",
+    "Nomor Meja / Unit Laptop",
+    "Nama Teknisi Lab",
+    "Status Kelayakan Ujian",
+    "Catatan Kondisi Laptop",
+    "Nama Orang Tua / Wali",
+    "Waktu Diperbarui"
+  ];
+  if (sheetLaptops.getLastRow() === 0) {
+    sheetLaptops.appendRow(headersLaptops);
+    sheetLaptops.getRange(1, 1, 1, headersLaptops.length)
+                .setBackground("#0f766e")
+                .setFontColor("#ffffff")
+                .setFontWeight("bold")
+                .setHorizontalAlignment("center");
+    sheetLaptops.setFrozenRows(1);
+  }
+
+  // 3. Sheet Proktor & Teknisi Lab Ujian
+  let sheetProktor = ss.getSheetByName(SHEET_PROKTOR);
+  if (!sheetProktor) {
+    sheetProktor = ss.insertSheet(SHEET_PROKTOR);
+  }
+  const headersProktor = [
+    "ID",
+    "Kode Ruang Lab",
+    "Range / No Urut Laptop",
+    "Nama Teknisi Lab",
+    "NIP Teknisi",
+    "Nama Proktor Ujian",
+    "NIP Proktor",
+    "Keterangan Ruangan",
+    "Waktu Diperbarui"
+  ];
+  if (sheetProktor.getLastRow() === 0) {
+    sheetProktor.appendRow(headersProktor);
+    sheetProktor.getRange(1, 1, 1, headersProktor.length)
+               .setBackground("#0369a1")
                .setFontColor("#ffffff")
                .setFontWeight("bold")
                .setHorizontalAlignment("center");
-    sheet.setFrozenRows(1);
+    sheetProktor.setFrozenRows(1);
   }
-  return sheet;
+
+  return { sheetStudents, sheetLaptops, sheetProktor };
 }
 
 function doGet(e) {
   try {
-    const sheet = setupSheet();
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) {
-      return responseJSON({ status: "success", data: [] });
-    }
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = setupAllSheets();
     
-    const headers = data[0];
-    const rows = data.slice(1);
-    
-    const result = rows.map(row => {
-      return {
-        id: row[0],
-        namaSiswa: row[1],
-        nis: row[2].toString(),
-        nisn: row[3].toString(),
-        kelas: row[4],
-        jenisKelamin: row[5],
-        mapelTka1: row[6],
-        mapelTka2: row[7],
-        prodiPilihan1: row[8],
-        prodiPilihan2: row[9],
-        noHp: row[10] ? row[10].toString() : "",
-        catatan: row[11],
-        updatedAt: row[12]
-      };
+    // Read Student Data
+    const studentRows = sheets.sheetStudents.getDataRange().getValues();
+    const students = studentRows.length > 1 ? studentRows.slice(1).map(parseStudentRow) : [];
+
+    // Read Laptop Data
+    const laptopRows = sheets.sheetLaptops.getDataRange().getValues();
+    const laptops = laptopRows.length > 1 ? laptopRows.slice(1).map(parseLaptopRow) : [];
+
+    // Read Proktor Data
+    const proktorRows = sheets.sheetProktor.getDataRange().getValues();
+    const proktorList = proktorRows.length > 1 ? proktorRows.slice(1).map(parseProktorRow) : [];
+
+    return responseJSON({
+      status: "success",
+      message: "Data Administrasi TKA, Laptop & Proktor berhasil dimuat",
+      data: students,
+      laptops: laptops,
+      proktorList: proktorList
     });
-    
-    return responseJSON({ status: "success", data: result });
   } catch (error) {
     return responseJSON({ status: "error", message: error.toString() });
   }
+}
+
+function parseStudentRow(row) {
+  var prestasiListParsed = [];
+  try {
+    if (row[22]) {
+      var str = row[22].toString();
+      if (str.indexOf("[") === 0) {
+        prestasiListParsed = JSON.parse(str);
+      }
+    }
+  } catch (err) {}
+
+  return {
+    id: row[0] ? row[0].toString() : "",
+    namaSiswa: row[1] ? row[1].toString() : "",
+    nis: row[2] ? row[2].toString() : "",
+    nisn: row[3] ? row[3].toString() : "",
+    kelas: row[4] ? row[4].toString() : "",
+    jenisKelamin: row[5] ? row[5].toString() : "L",
+    noHp: row[6] ? row[6].toString() : "",
+    fotoSiswa: row[7] ? row[7].toString() : "",
+    mapelTka1: row[8] ? row[8].toString() : "",
+    mapelTka2: row[9] ? row[9].toString() : "",
+    pilihanStudiLanjut: row[10] ? row[10].toString() : "Kuliah",
+    ptn1: row[11] ? row[11].toString() : "",
+    prodiPilihan1: row[12] ? row[12].toString() : "",
+    akreditasiPilihan1: row[13] ? row[13].toString() : "",
+    kriteriaPilihan1: row[14] ? row[14].toString() : "",
+    ptn2: row[15] ? row[15].toString() : "",
+    prodiPilihan2: row[16] ? row[16].toString() : "",
+    akreditasiPilihan2: row[17] ? row[17].toString() : "",
+    kriteriaPilihan2: row[18] ? row[18].toString() : "",
+    mengajukanKipKuliah: row[19] ? row[19].toString() : "Tidak",
+    kategoriDesil: row[20] ? row[20].toString() : "",
+    prestasiList: prestasiListParsed,
+    catatan: row[23] ? row[23].toString() : "",
+    updatedAt: row[24] ? row[24].toString() : new Date().toISOString()
+  };
+}
+
+function parseLaptopRow(row) {
+  return {
+    id: row[0] ? row[0].toString() : "",
+    studentId: row[1] ? row[1].toString() : "",
+    namaSiswa: row[2] ? row[2].toString() : "",
+    kelas: row[3] ? row[3].toString() : "",
+    gelombang: row[4] ? row[4].toString() : "1",
+    merkLaptop: row[5] ? row[5].toString() : "",
+    kelengkapan: {
+      charger: row[6] === true || row[6] === "Ada" || row[6] === "Ya" || row[6] === 1,
+      mouse: row[7] === true || row[7] === "Ada" || row[7] === "Ya" || row[7] === 1,
+      keyboard: row[8] === true || row[8] === "Ada" || row[8] === "Ya" || row[8] === 1,
+    },
+    kodeRuang: row[9] ? row[9].toString() : "",
+    noUrutLaptop: row[10] ? row[10].toString() : "",
+    namaTeknisi: row[11] ? row[11].toString() : "",
+    statusKelayakan: row[12] ? row[12].toString() : "LAYAK",
+    catatanKondisi: row[13] ? row[13].toString() : "",
+    namaOrangTua: row[14] ? row[14].toString() : "",
+    updatedAt: row[15] ? row[15].toString() : new Date().toISOString()
+  };
+}
+
+function parseProktorRow(row) {
+  return {
+    id: row[0] ? row[0].toString() : "",
+    kodeRuang: row[1] ? row[1].toString() : "",
+    noUrutLaptop: row[2] ? row[2].toString() : "",
+    namaTeknisi: row[3] ? row[3].toString() : "",
+    nipTeknisi: row[4] ? row[4].toString() : "",
+    namaProktor: row[5] ? row[5].toString() : "",
+    nipProktor: row[6] ? row[6].toString() : "",
+    keterangan: row[7] ? row[7].toString() : "",
+    updatedAt: row[8] ? row[8].toString() : new Date().toISOString()
+  };
 }
 
 function doPost(e) {
   try {
     const contents = JSON.parse(e.postData.contents);
     const action = contents.action || "save";
-    const sheet = setupSheet();
-    
-    if (action === "save" || action === "update") {
-      const student = contents.student;
-      const data = sheet.getDataRange().getValues();
-      let rowIndex = -1;
-      
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] == student.id || data[i][2] == student.nis) {
-          rowIndex = i + 1; // 1-based index
-          break;
-        }
-      }
-      
-      const rowData = [
-        student.id || "std-" + Date.now(),
-        student.namaSiswa,
-        student.nis,
-        student.nisn,
-        student.kelas,
-        student.jenisKelamin,
-        student.mapelTka1,
-        student.mapelTka2,
-        student.prodiPilihan1,
-        student.prodiPilihan2,
-        student.noHp || "",
-        student.catatan || "",
-        new Date().toISOString().split("T")[0]
-      ];
-      
-      if (rowIndex > 0) {
-        sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
-      } else {
-        sheet.appendRow(rowData);
-      }
-      
-      return responseJSON({ status: "success", message: "Data berhasil disimpan!", student: student });
+    const target = contents.target || "student";
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = setupAllSheets();
+
+    if (target === "laptop" || action === "saveLaptop" || action === "deleteLaptop") {
+      return handleLaptopPost(sheets.sheetLaptops, action, contents);
     }
-    
-    if (action === "delete") {
-      const studentId = contents.id;
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] == studentId) {
-          sheet.deleteRow(i + 1);
-          return responseJSON({ status: "success", message: "Data berhasil dihapus" });
-        }
-      }
-      return responseJSON({ status: "error", message: "Data tidak ditemukan" });
+
+    if (target === "proktor" || action === "saveProktor" || action === "deleteProktor") {
+      return handleProktorPost(sheets.sheetProktor, action, contents);
     }
-    
-    return responseJSON({ status: "error", message: "Action tidak dikenal" });
+
+    return handleStudentPost(sheets.sheetStudents, action, contents);
   } catch (error) {
     return responseJSON({ status: "error", message: error.toString() });
   }
+}
+
+function handleStudentPost(sheet, action, contents) {
+  if (action === "save" || action === "update") {
+    const student = contents.student || contents.data;
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == student.id || (student.nis && data[i][2] == student.nis)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    var jmlPrestasi = (student.prestasiList && Array.isArray(student.prestasiList)) ? student.prestasiList.length : 0;
+    var detailPrestasiJson = (student.prestasiList && Array.isArray(student.prestasiList)) ? JSON.stringify(student.prestasiList) : "";
+    
+    const rowData = [
+      student.id || "std-" + Date.now(),
+      student.namaSiswa || "",
+      student.nis || "",
+      student.nisn || "",
+      student.kelas || "",
+      student.jenisKelamin || "L",
+      student.noHp || "",
+      student.fotoSiswa || "",
+      student.mapelTka1 || "",
+      student.mapelTka2 || "",
+      student.pilihanStudiLanjut || "Kuliah",
+      student.ptn1 || "",
+      student.prodiPilihan1 || "",
+      student.akreditasiPilihan1 || "",
+      student.kriteriaPilihan1 || "",
+      student.ptn2 || "",
+      student.prodiPilihan2 || "",
+      student.akreditasiPilihan2 || "",
+      student.kriteriaPilihan2 || "",
+      student.mengajukanKipKuliah || "Tidak",
+      student.kategoriDesil || "",
+      jmlPrestasi,
+      detailPrestasiJson,
+      student.catatan || "",
+      new Date().toISOString().split("T")[0]
+    ];
+    
+    if (rowIndex > 0) {
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      sheet.appendRow(rowData);
+    }
+    
+    return responseJSON({ status: "success", message: "Data Siswa TKA berhasil disimpan di Google Sheets!", student: student });
+  }
+  
+  if (action === "delete") {
+    const studentId = contents.id;
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == studentId) {
+        sheet.deleteRow(i + 1);
+        return responseJSON({ status: "success", message: "Data Siswa berhasil dihapus" });
+      }
+    }
+    return responseJSON({ status: "error", message: "Data Siswa tidak ditemukan" });
+  }
+
+  return responseJSON({ status: "error", message: "Action tidak dikenal" });
+}
+
+function handleLaptopPost(sheet, action, contents) {
+  if (action === "saveLaptop" || action === "save" || action === "update") {
+    const laptop = contents.laptop || contents.data;
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == laptop.id || (laptop.studentId && data[i][1] == laptop.studentId)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    const rowData = [
+      laptop.id || "lpt-" + Date.now(),
+      laptop.studentId || "",
+      laptop.namaSiswa || "",
+      laptop.kelas || "",
+      laptop.gelombang || "1",
+      laptop.merkLaptop || "",
+      laptop.kelengkapan && laptop.kelengkapan.charger ? "Ada" : "Tidak Ada",
+      laptop.kelengkapan && laptop.kelengkapan.mouse ? "Ada" : "Tidak Ada",
+      laptop.kelengkapan && laptop.kelengkapan.keyboard ? "Ada" : "Tidak Ada",
+      laptop.kodeRuang || "",
+      laptop.noUrutLaptop || "",
+      laptop.namaTeknisi || "",
+      laptop.statusKelayakan || "LAYAK",
+      laptop.catatanKondisi || "",
+      laptop.namaOrangTua || "",
+      new Date().toISOString().split("T")[0]
+    ];
+
+    if (rowIndex > 0) {
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      sheet.appendRow(rowData);
+    }
+
+    return responseJSON({ status: "success", message: "Data Laptop Inventaris Sarana Ujian TKA berhasil disimpan!", laptop: laptop });
+  }
+
+  if (action === "deleteLaptop" || action === "delete") {
+    const laptopId = contents.id;
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == laptopId) {
+        sheet.deleteRow(i + 1);
+        return responseJSON({ status: "success", message: "Data Laptop berhasil dihapus" });
+      }
+    }
+    return responseJSON({ status: "error", message: "Data Laptop tidak ditemukan" });
+  }
+
+  return responseJSON({ status: "error", message: "Action laptop tidak dikenal" });
+}
+
+function handleProktorPost(sheet, action, contents) {
+  if (action === "saveProktor" || action === "save" || action === "update") {
+    const proktor = contents.proktor || contents.data;
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == proktor.id || (proktor.kodeRuang && data[i][1] == proktor.kodeRuang)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    const rowData = [
+      proktor.id || "prk-" + Date.now(),
+      proktor.kodeRuang || "",
+      proktor.noUrutLaptop || "",
+      proktor.namaTeknisi || "",
+      proktor.nipTeknisi || "",
+      proktor.namaProktor || "",
+      proktor.nipProktor || "",
+      proktor.keterangan || "",
+      new Date().toISOString().split("T")[0]
+    ];
+
+    if (rowIndex > 0) {
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      sheet.appendRow(rowData);
+    }
+
+    return responseJSON({ status: "success", message: "Data Proktor & Teknisi Lab berhasil disimpan!", proktor: proktor });
+  }
+
+  if (action === "deleteProktor" || action === "delete") {
+    const proktorId = contents.id;
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == proktorId) {
+        sheet.deleteRow(i + 1);
+        return responseJSON({ status: "success", message: "Data Proktor berhasil dihapus" });
+      }
+    }
+    return responseJSON({ status: "error", message: "Data Proktor tidak ditemukan" });
+  }
+
+  return responseJSON({ status: "error", message: "Action proktor tidak dikenal" });
 }
 
 function responseJSON(obj) {

@@ -258,11 +258,22 @@ Diperbarui Tanggal  : ${student.updatedAt}
                       {student.ptn1 || 'Perguruan Tinggi Pilihan 1'}
                     </span>
                   </div>
-                  <div className="pt-1 border-t border-emerald-200/50">
-                    <span className="text-[10px] text-slate-500 block font-medium">Program Studi:</span>
+                  <div className="pt-1 border-t border-emerald-200/50 space-y-1">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-slate-500 font-medium">Program Studi:</span>
+                      <span className="font-extrabold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-200">
+                        BAN-PT: {student.akreditasiPilihan1 || 'Unggul'}
+                      </span>
+                    </div>
                     <span className="font-bold text-slate-800 text-xs block">
                       {student.prodiPilihan1 || '-'}
                     </span>
+                    {student.kriteriaPilihan1 && (
+                      <div className="text-[10px] bg-white/80 p-1.5 rounded-lg border border-emerald-200/80 text-slate-700 mt-1">
+                        <strong className="text-emerald-950 font-bold block mb-0.5">Kriteria & Pertimbangan:</strong>
+                        <span>{student.kriteriaPilihan1}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -283,11 +294,22 @@ Diperbarui Tanggal  : ${student.updatedAt}
                       {student.ptn2 || 'Perguruan Tinggi Pilihan 2'}
                     </span>
                   </div>
-                  <div className="pt-1 border-t border-teal-200/50">
-                    <span className="text-[10px] text-slate-500 block font-medium">Program Studi:</span>
+                  <div className="pt-1 border-t border-teal-200/50 space-y-1">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-slate-500 font-medium">Program Studi:</span>
+                      <span className="font-extrabold text-teal-800 bg-teal-100/90 px-1.5 py-0.5 rounded border border-teal-200">
+                        BAN-PT: {student.akreditasiPilihan2 || 'Unggul'}
+                      </span>
+                    </div>
                     <span className="font-bold text-slate-800 text-xs block">
                       {student.prodiPilihan2 || '-'}
                     </span>
+                    {student.kriteriaPilihan2 && (
+                      <div className="text-[10px] bg-white/80 p-1.5 rounded-lg border border-teal-200/80 text-slate-700 mt-1">
+                        <strong className="text-teal-950 font-bold block mb-0.5">Kriteria & Pertimbangan:</strong>
+                        <span>{student.kriteriaPilihan2}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

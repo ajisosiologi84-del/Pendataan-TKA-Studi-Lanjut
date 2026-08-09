@@ -276,7 +276,6 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
             <div class="flex-grid">
               <div style="text-align: center;">
                 <div class="pasfoto-box">${fotoHtml}</div>
-                <div style="font-size: 9px; font-weight: 700; color: #64748b; margin-top: 4px;">PASFOTO RESMI</div>
               </div>
               <div style="flex: 1;">
                 <table>
@@ -355,8 +354,9 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
                   <td class="td-label">Pilihan 1 (Utama)</td>
                   <td>
                     <div style="font-weight: 800; color: #0f172a;">${formData.ptn1 || '-'} — ${formData.prodiPilihan1 || '-'}</div>
-                    <div style="font-size: 10px; color: #475569; font-weight: 600; margin-top: 2px;">
-                      Status BAN-PT: ${banpt1 ? `🌟 Akreditasi ${banpt1.akreditasi} (No SK: ${banpt1.nomorSk})` : 'Tercatat di Sistem'}
+                    <div style="font-size: 10px; color: #047857; font-weight: 700; margin-top: 2px;">
+                      Akreditasi BAN-PT: ${formData.akreditasiPilihan1 || banpt1?.akreditasi || 'Unggul'}
+                      ${formData.kriteriaPilihan1 ? ` | <span style="color: #334155;">Kriteria: ${formData.kriteriaPilihan1}</span>` : ''}
                     </div>
                   </td>
                 </tr>
@@ -364,8 +364,9 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
                   <td class="td-label">Pilihan 2 (Alternatif)</td>
                   <td>
                     <div style="font-weight: 800; color: #0f172a;">${formData.ptn2 || '-'} — ${formData.prodiPilihan2 || '-'}</div>
-                    <div style="font-size: 10px; color: #475569; font-weight: 600; margin-top: 2px;">
-                      Status BAN-PT: ${banpt2 ? `🌟 Akreditasi ${banpt2.akreditasi} (No SK: ${banpt2.nomorSk})` : 'Tercatat di Sistem'}
+                    <div style="font-size: 10px; color: #0f766e; font-weight: 700; margin-top: 2px;">
+                      Akreditasi BAN-PT: ${formData.akreditasiPilihan2 || banpt2?.akreditasi || 'Unggul'}
+                      ${formData.kriteriaPilihan2 ? ` | <span style="color: #334155;">Kriteria: ${formData.kriteriaPilihan2}</span>` : ''}
                     </div>
                   </td>
                 </tr>
@@ -851,9 +852,6 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
                       </div>
                     )}
                   </div>
-                  <span className="text-[9px] text-slate-500 font-bold">
-                    PASFOTO RESMI
-                  </span>
                 </div>
 
                 {/* TABEL IDENTITAS */}
@@ -959,8 +957,9 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
                       <div className="font-extrabold text-slate-900">
                         {formData.ptn1 || '-'} — {formData.prodiPilihan1 || '-'}
                       </div>
-                      <div className="text-[10px] text-slate-600 font-semibold mt-0.5">
-                        Status BAN-PT: {banpt1 ? `🌟 Akreditasi ${banpt1.akreditasi} (No SK: ${banpt1.nomorSk})` : 'Tercatat di Sistem'}
+                      <div className="text-[10px] text-emerald-800 font-bold mt-0.5">
+                        Akreditasi BAN-PT: {formData.akreditasiPilihan1 || banpt1?.akreditasi || 'Unggul'}
+                        {formData.kriteriaPilihan1 && <span className="text-slate-600 ml-1">| Kriteria: {formData.kriteriaPilihan1}</span>}
                       </div>
                     </td>
                   </tr>
@@ -970,8 +969,9 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
                       <div className="font-extrabold text-slate-900">
                         {formData.ptn2 || '-'} — {formData.prodiPilihan2 || '-'}
                       </div>
-                      <div className="text-[10px] text-slate-600 font-semibold mt-0.5">
-                        Status BAN-PT: {banpt2 ? `🌟 Akreditasi ${banpt2.akreditasi} (No SK: ${banpt2.nomorSk})` : 'Tercatat di Sistem'}
+                      <div className="text-[10px] text-teal-800 font-bold mt-0.5">
+                        Akreditasi BAN-PT: {formData.akreditasiPilihan2 || banpt2?.akreditasi || 'Unggul'}
+                        {formData.kriteriaPilihan2 && <span className="text-slate-600 ml-1">| Kriteria: {formData.kriteriaPilihan2}</span>}
                       </div>
                     </td>
                   </tr>

@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { Search, ExternalLink, Building2, Award, BookOpen, CheckCircle2, Filter, Info, HelpCircle } from 'lucide-react';
+import { Search, ExternalLink, Building2, Award, BookOpen, CheckCircle2, Filter, Info, HelpCircle, Plus, Check } from 'lucide-react';
 import { SAMPLE_BANPT_DATA, ProdiData } from '../data/banptData';
 
-export const BanPtDirectoryView: React.FC = () => {
+interface BanPtDirectoryViewProps {
+  onSelectProdiForForm?: (ptn: string, prodi: string, choice: 'pilihan1' | 'pilihan2', akreditasi?: string) => void;
+}
+
+export const BanPtDirectoryView: React.FC<BanPtDirectoryViewProps> = ({
+  onSelectProdiForForm,
+}) => {
   const [searchPtn, setSearchPtn] = useState('');
   const [searchProdi, setSearchProdi] = useState('');
   const [selectedJenjang, setSelectedJenjang] = useState<string>('ALL');
   const [selectedAkreditasi, setSelectedAkreditasi] = useState<string>('ALL');
+  const [selectedNotification, setSelectedNotification] = useState<string | null>(null);
 
   const BANPT_URL = 'https://www.banpt.or.id/direktori/prodi/pencarian_prodi.php';
 
@@ -17,6 +24,14 @@ export const BanPtDirectoryView: React.FC = () => {
     const matchAkreditasi = selectedAkreditasi === 'ALL' || item.akreditasi === selectedAkreditasi;
     return matchPtn && matchProdi && matchJenjang && matchAkreditasi;
   });
+
+  const handleSelect = (ptn: string, prodi: string, choice: 'pilihan1' | 'pilihan2', akreditasi?: string) => {
+    setSelectedNotification(`Berhasil memilih ${prodi} (${ptn}) [${akreditasi || 'BAN-PT'}] sebagai ${choice === 'pilihan1' ? 'Pilihan 1' : 'Pilihan 2'}`);
+    setTimeout(() => setSelectedNotification(null), 3000);
+    if (onSelectProdiForForm) {
+      onSelectProdiForForm(ptn, prodi, choice, akreditasi);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -286,15 +301,39 @@ export const BanPtDirectoryView: React.FC = () => {
                         s.d. {item.tahunKedaluwarsa}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <a
-                          href={`${BANPT_URL}?ptn=${encodeURIComponent(item.ptn)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
-                        >
-                          <span>Verifikasi BAN-PT</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {onSelectProdiForForm && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleSelect(item.ptn, item.prodi, 'pilihan1', item.akreditasi)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg shadow-xs transition-all flex items-center gap-1 whitespace-nowrap"
+                                title={`Pilih ${item.prodi} (${item.ptn}) ke Formulir Siswa Pilihan 1`}
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Pilihan 1</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSelect(item.ptn, item.prodi, 'pilihan2', item.akreditasi)}
+                                className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg shadow-xs transition-all flex items-center gap-1 whitespace-nowrap"
+                                title={`Pilih ${item.prodi} (${item.ptn}) ke Formulir Siswa Pilihan 2`}
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Pilihan 2</span>
+                              </button>
+                            </>
+                          )}
+                          <a
+                            href={`${BANPT_URL}?ptn=${encodeURIComponent(item.ptn)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline px-2 py-1 rounded-md hover:bg-indigo-50"
+                          >
+                            <span>Verifikasi</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   ))

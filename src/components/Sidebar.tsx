@@ -27,7 +27,7 @@ interface SidebarProps {
   appsScriptUrl: string;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
-  userRole: 'superadmin' | 'walikelas' | 'bk' | 'siswa' | null;
+  userRole: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null;
   currentUserNis?: string | null;
   onLogout: () => void;
 }
@@ -43,13 +43,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUserNis,
   onLogout,
 }) => {
-  const allNavItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string | number; description: string; roles: ('superadmin' | 'walikelas' | 'bk' | 'siswa')[] }[] = [
+  const allNavItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string | number; description: string; roles: ('superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa')[] }[] = [
     {
       id: 'dashboard',
       label: 'Dashboard Overview',
       icon: <LayoutDashboard className="w-5 h-5" />,
       description: 'Ringkasan data & statistik',
-      roles: ['superadmin', 'walikelas', 'bk'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
     },
     {
       id: 'students',
@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Users className="w-5 h-5" />,
       badge: totalStudents,
       description: 'Tabel & pencarian siswa',
-      roles: ['superadmin', 'walikelas', 'bk'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
     },
     {
       id: 'form',
@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Award className="w-5 h-5" />,
       badge: 'BAN-PT',
       description: 'Akreditasi Prodi Seluruh Indonesia',
-      roles: ['superadmin', 'walikelas', 'bk', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
     },
     {
       id: 'mapelPilihan',
@@ -80,22 +80,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <BookOpen className="w-5 h-5" />,
       badge: 'SNBP',
       description: 'Matriks Mapel Pendukung Prodi PTN',
-      roles: ['superadmin', 'walikelas', 'bk', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
     },
     {
       id: 'laptop',
-      label: 'Pendataan Laptop Siswa',
+      label: 'Pendataan Laptop & Sarana Ujian TKA',
       icon: <Laptop className="w-5 h-5" />,
-      badge: 'PDF',
-      description: 'Inventaris & Surat Meminjamkan',
-      roles: ['superadmin', 'walikelas', 'bk'],
+      badge: 'PROKTOR',
+      description: 'Inventaris Laptop, Lab & Suasana Ujian',
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
     },
     {
       id: 'analysis',
       label: 'Analisis Pilihan',
       icon: <BarChart3 className="w-5 h-5" />,
       description: 'Matriks Mapel & Studi Lanjut',
-      roles: ['superadmin', 'walikelas', 'bk'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
     },
     {
       id: 'appscript',
@@ -122,6 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'superadmin': return 'Super Admin';
       case 'walikelas': return 'Wali Kelas';
       case 'bk': return 'Guru BK';
+      case 'proktor': return 'Proktor / Teknisi Lab';
       case 'siswa': return `Siswa (NIS: ${currentUserNis || '-'})`;
       default: return 'Tamu';
     }
@@ -132,6 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'superadmin': return 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
       case 'walikelas': return 'bg-sky-500/20 text-sky-300 border-sky-500/30';
       case 'bk': return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+      case 'proktor': return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
       case 'siswa': return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
       default: return 'bg-slate-700 text-slate-300';
     }

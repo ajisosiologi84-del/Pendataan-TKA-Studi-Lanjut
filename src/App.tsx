@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationTab, Student, LaptopData, ProktorTeknisi, DocumentSettings } from './types';
 import {
   getStoredStudents,
@@ -19,8 +19,11 @@ import {
   deleteProktorTeknisi,
   getStoredDocSettings,
   saveDocSettings,
-  DEFAULT_DOCUMENT_SETTINGS
+  DEFAULT_DOCUMENT_SETTINGS,
+  addSecurityLog,
+  saveStudents
 } from './utils/storage';
+import { subscribeStudentsFromFirestore, syncStudentToFirestore } from './firebase';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -36,7 +39,7 @@ import { StudentDetailModal } from './components/StudentDetailModal';
 import { LoginModal } from './components/LoginModal';
 
 export default function App() {
-  const [userRole, setUserRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'siswa' | null>(null);
+  const [userRole, setUserRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null>(null);
   const [currentUserNis, setCurrentUserNis] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
   const [students, setStudents] = useState<Student[]>([]);
@@ -47,16 +50,72 @@ export default function App() {
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [appsScriptUrl, setAppsScriptUrl] = useState('');
+  const [pendingBanPtSelection, setPendingBanPtSelection] = useState<{
+    targetChoice: 'pilihan1' | 'pilihan2';
+    ptn: string;
+    prodi: string;
+    akreditasi?: string;
+  } | null>(null);
 
-  // Initial load
+  // Initial load & Firestore Realtime Sync
   useEffect(() => {
-    const list = getStoredStudents();
-    setStudents(list);
+    const localList = getStoredStudents();
+    setStudents(localList);
     setLaptops(getStoredLaptops());
     setProktorList(getStoredProktorTeknisi());
     setDocSettings(getStoredDocSettings());
     setAppsScriptUrl(getAppsScriptUrl());
+
+    // Subscribe to Firestore changes
+    const unsubscribe = subscribeStudentsFromFirestore((remoteStudents) => {
+      if (remoteStudents && remoteStudents.length > 0) {
+        setStudents(remoteStudents);
+        saveStudents(remoteStudents);
+      } else if (localList && localList.length > 0) {
+        // First time cloud sync: sync local students to Firestore
+        localList.forEach((s) => syncStudentToFirestore(s));
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  // Inactivity Auto-Logout Timeout (15 minutes = 900 seconds)
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!userRole) return;
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = setTimeout(() => {
+        addSecurityLog({
+          role: userRole || 'UNKNOWN',
+          userIdentifier: currentUserNis || undefined,
+          action: 'AUTO_LOGOUT',
+          category: 'AUTH',
+          status: 'WARNING',
+          details: `Sesi berakhir otomatis (Idle 15 menit tanpa aktivitas)`,
+        });
+        setUserRole(null);
+        setCurrentUserNis(null);
+        setEditingStudent(null);
+        setActiveTab('dashboard');
+        alert('🔒 Sesi Anda telah berakhir secara otomatis demi keamanan karena tidak ada aktivitas selama 15 menit.');
+      }, 15 * 60 * 1000); // 15 minutes
+    };
+
+    // Event listeners to detect activity
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    activityEvents.forEach((evt) => window.addEventListener(evt, resetInactivityTimer));
+
+    resetInactivityTimer();
+
+    return () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      activityEvents.forEach((evt) => window.removeEventListener(evt, resetInactivityTimer));
+    };
+  }, [userRole, currentUserNis]);
 
   const handleLogin = (role: 'superadmin' | 'walikelas' | 'bk' | 'siswa', nis?: string) => {
     setUserRole(role);
@@ -89,6 +148,16 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    if (userRole) {
+      addSecurityLog({
+        role: userRole,
+        userIdentifier: currentUserNis || undefined,
+        action: 'LOGOUT',
+        category: 'AUTH',
+        status: 'SUCCESS',
+        details: `Pengguna keluar (Logout) dari sistem`,
+      });
+    }
     setUserRole(null);
     setCurrentUserNis(null);
     setEditingStudent(null);
@@ -101,8 +170,18 @@ export default function App() {
       alert('Akses ditolak: Wali Kelas dan Guru BK memiliki hak akses baca (read-only).');
       return;
     }
-    addLaptop(data);
+    const newLaptop = addLaptop(data);
     setLaptops(getStoredLaptops());
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'laptop', action: 'saveLaptop', laptop: newLaptop }),
+        }).catch((err) => console.log('Apps Script Laptop sync note:', err));
+      } catch (err) {}
+    }
   };
 
   const handleUpdateLaptop = (data: LaptopData) => {
@@ -112,6 +191,16 @@ export default function App() {
     }
     updateLaptop(data);
     setLaptops(getStoredLaptops());
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'laptop', action: 'saveLaptop', laptop: data }),
+        }).catch((err) => console.log('Apps Script Laptop sync note:', err));
+      } catch (err) {}
+    }
   };
 
   const handleDeleteLaptop = (id: string) => {
@@ -121,6 +210,16 @@ export default function App() {
     }
     deleteLaptop(id);
     setLaptops(getStoredLaptops());
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'laptop', action: 'deleteLaptop', id }),
+        }).catch((err) => console.log('Apps Script Laptop sync note:', err));
+      } catch (err) {}
+    }
   };
 
   const handleResetLaptops = () => {
@@ -132,20 +231,50 @@ export default function App() {
   // Proktor / Teknisi handlers
   const handleAddProktor = (data: Omit<ProktorTeknisi, 'id'>) => {
     if (userRole === 'walikelas' || userRole === 'bk') return;
-    addProktorTeknisi(data);
+    const newProktor = addProktorTeknisi(data);
     setProktorList(getStoredProktorTeknisi());
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'proktor', action: 'saveProktor', proktor: newProktor }),
+        }).catch((err) => console.log('Apps Script Proktor sync note:', err));
+      } catch (err) {}
+    }
   };
 
   const handleUpdateProktor = (data: ProktorTeknisi) => {
     if (userRole === 'walikelas' || userRole === 'bk') return;
     updateProktorTeknisi(data);
     setProktorList(getStoredProktorTeknisi());
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'proktor', action: 'saveProktor', proktor: data }),
+        }).catch((err) => console.log('Apps Script Proktor sync note:', err));
+      } catch (err) {}
+    }
   };
 
   const handleDeleteProktor = (id: string) => {
     if (userRole === 'walikelas' || userRole === 'bk') return;
     deleteProktorTeknisi(id);
     setProktorList(getStoredProktorTeknisi());
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'proktor', action: 'deleteProktor', id }),
+        }).catch((err) => console.log('Apps Script Proktor sync note:', err));
+      } catch (err) {}
+    }
   };
 
   // Doc Settings handlers
@@ -177,6 +306,14 @@ export default function App() {
       } else {
         addStudent(payload);
       }
+      addSecurityLog({
+        role: 'siswa',
+        userIdentifier: currentUserNis,
+        action: 'UPDATE_STUDENT_SELF',
+        category: 'DATA_CHANGE',
+        status: 'SUCCESS',
+        details: `Siswa memperbarui data mandiri (Nama: ${data.namaSiswa || 'Siswa'}, NIS: ${currentUserNis})`,
+      });
       alert('Data Formulir Anda Berhasil Disimpan!');
       const refreshed = getStoredStudents();
       setStudents(refreshed);
@@ -187,8 +324,22 @@ export default function App() {
 
     if ('id' in data && data.id) {
       updateStudent(data as Student);
+      addSecurityLog({
+        role: userRole || 'superadmin',
+        action: 'UPDATE_STUDENT',
+        category: 'DATA_CHANGE',
+        status: 'SUCCESS',
+        details: `Memperbarui data siswa (${data.namaSiswa}, NIS: ${data.nis})`,
+      });
     } else {
       addStudent(data);
+      addSecurityLog({
+        role: userRole || 'superadmin',
+        action: 'ADD_STUDENT',
+        category: 'DATA_CHANGE',
+        status: 'SUCCESS',
+        details: `Menambah siswa baru (${data.namaSiswa}, NIS: ${data.nis})`,
+      });
     }
     const refreshed = getStoredStudents();
     setStudents(refreshed);
@@ -202,7 +353,15 @@ export default function App() {
       alert('Akses ditolak: Wali Kelas dan Guru BK memiliki hak akses lihat (read-only).');
       return;
     }
+    const target = students.find((s) => s.id === id);
     deleteStudent(id);
+    addSecurityLog({
+      role: userRole || 'superadmin',
+      action: 'DELETE_STUDENT',
+      category: 'DATA_CHANGE',
+      status: 'SUCCESS',
+      details: `Menghapus data siswa (${target?.namaSiswa || id}, NIS: ${target?.nis || '-'})`,
+    });
     const refreshed = getStoredStudents();
     setStudents(refreshed);
     if (detailStudent?.id === id) {
@@ -216,6 +375,13 @@ export default function App() {
     if (window.confirm('Apakah Anda yakin ingin mengembalikan data ke contoh bawaan awal?')) {
       const defaultList = resetToDefaultData();
       setStudents(defaultList);
+      addSecurityLog({
+        role: 'superadmin',
+        action: 'RESET_STUDENTS_DATA',
+        category: 'SYSTEM',
+        status: 'WARNING',
+        details: 'Super Admin mereset seluruh database siswa ke sampel awal bawaan',
+      });
     }
   };
 
@@ -255,6 +421,10 @@ export default function App() {
           }
           if ((userRole === 'walikelas' || userRole === 'bk') && (tab === 'form' || tab === 'appscript' || tab === 'settings')) {
             alert('Wali Kelas dan Guru BK tidak memiliki akses ke menu ini.');
+            return;
+          }
+          if (userRole === 'proktor' && (tab === 'form' || tab === 'appscript' || tab === 'settings')) {
+            alert('Akses Proktor/Teknisi dikhususkan untuk Pendataan Laptop & Sarana Lab TKA, Overview, Data Siswa, serta Referensi PTN.');
             return;
           }
           setActiveTab(tab);
@@ -323,6 +493,9 @@ export default function App() {
                 setEditingStudent(null);
                 setActiveTab('students');
               }}
+              onOpenBanPtDirectory={() => setActiveTab('banpt')}
+              prefilledBanPtSelection={pendingBanPtSelection}
+              onClearPrefilledBanPt={() => setPendingBanPtSelection(null)}
             />
           )}
 
@@ -379,7 +552,14 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'banpt' && <BanPtDirectoryView />}
+          {activeTab === 'banpt' && (
+            <BanPtDirectoryView
+              onSelectProdiForForm={(ptn, prodi, choice, akreditasi) => {
+                setPendingBanPtSelection({ targetChoice: choice, ptn, prodi, akreditasi });
+                setActiveTab('form');
+              }}
+            />
+          )}
 
           {activeTab === 'mapelPilihan' && <MapelPilihanView userRole={userRole} />}
         </main>

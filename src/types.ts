@@ -26,6 +26,10 @@ export interface Student {
   prodiPilihan2: string;
   ptn1?: string;
   ptn2?: string;
+  akreditasiPilihan1?: string;
+  kriteriaPilihan1?: string;
+  akreditasiPilihan2?: string;
+  kriteriaPilihan2?: string;
   mengajukanKipKuliah?: 'Ya' | 'Tidak';
   kategoriDesil?: 'Desil 1' | 'Desil 2' | 'Desil 3' | 'Desil 4' | 'Desil 5' | '';
   noHp?: string;
@@ -99,9 +103,52 @@ export interface MapelTkaCount {
   total: number;
 }
 
-export interface ProdiCount {
-  name: string;
-  count1: number;
-  count2: number;
-  total: number;
+export interface RolePermissions {
+  canEditStudent: boolean;
+  canDeleteStudent: boolean;
+  canExportData: boolean;
+  canImportData: boolean;
+  canManageLaptops: boolean;
+  canManageSettings: boolean;
+  canViewAuditLogs: boolean;
+  canAccessBanPt: boolean;
+  canManageUsers: boolean;
+  canResetDatabase: boolean;
 }
+
+export interface CustomUserAccount {
+  id: string;
+  username: string; // NIP / Username / Email
+  fullName: string;
+  role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'panitia' | 'read_only';
+  passwordHash: string;
+  status: 'AKTIF' | 'NONAKTIF' | 'LOCKED';
+  kelasAkses?: string; // e.g., "XII MIPA 1" or "ALL"
+  lastLogin?: string;
+  createdAt: string;
+}
+
+export interface SystemSecurityPolicy {
+  minPasswordLength: number;
+  requireNumbers: boolean;
+  requireSpecialChar: boolean;
+  requireUppercase: boolean;
+  maxLoginAttempts: number;
+  lockoutMinutes: number;
+  sessionTimeoutMinutes: number;
+  enableTwoFactorPin: boolean;
+  securityPin: string;
+  forcePasswordPeriodDays: number;
+}
+
+export interface ActiveUserSession {
+  sessionId: string;
+  username: string;
+  role: string;
+  deviceInfo: string;
+  ipAddress: string;
+  loginTime: string;
+  lastActive: string;
+  isCurrent: boolean;
+}
+
