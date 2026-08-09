@@ -23,9 +23,13 @@ import {
   addSecurityLog,
   saveStudents,
   saveLaptops,
-  saveProktorTeknisi
+  saveProktorTeknisi,
+  saveSystemPasswords,
+  saveCustomUsers,
+  saveRolePermissions,
+  saveSecurityPolicy
 } from './utils/storage';
-import { subscribeStudentsFromFirestore, syncStudentToFirestore } from './firebase';
+import { subscribeStudentsFromFirestore, syncStudentToFirestore, fetchSystemSettingsFromFirestore } from './firebase';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -37,6 +41,7 @@ import { LaptopInventoryView } from './components/LaptopInventoryView';
 import { SettingsView } from './components/SettingsView';
 import { BanPtDirectoryView } from './components/BanPtDirectoryView';
 import { MapelPilihanView } from './components/MapelPilihanView';
+import { SnbpCalculatorView } from './components/SnbpCalculatorView';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { LoginModal } from './components/LoginModal';
 
@@ -51,6 +56,7 @@ export default function App() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isCompactMode, setIsCompactMode] = useState(false);
   const [appsScriptUrl, setAppsScriptUrl] = useState('');
   const [pendingBanPtSelection, setPendingBanPtSelection] = useState<{
     targetChoice: 'pilihan1' | 'pilihan2';
@@ -100,6 +106,20 @@ export default function App() {
     if (gasUrl) {
       syncFromGoogleSheets(gasUrl);
     }
+
+    // Sync system settings (passwords, users, permissions, policy) from Firebase Firestore
+    fetchSystemSettingsFromFirestore('passwords').then((remotePass) => {
+      if (remotePass) saveSystemPasswords(remotePass, false);
+    });
+    fetchSystemSettingsFromFirestore('customUsers').then((remoteUsers) => {
+      if (remoteUsers) saveCustomUsers(remoteUsers, false);
+    });
+    fetchSystemSettingsFromFirestore('rolePermissions').then((remoteMatrix) => {
+      if (remoteMatrix) saveRolePermissions(remoteMatrix, false);
+    });
+    fetchSystemSettingsFromFirestore('securityPolicy').then((remotePolicy) => {
+      if (remotePolicy) saveSecurityPolicy(remotePolicy, false);
+    });
 
     // Subscribe to Firestore changes
     const unsubscribe = subscribeStudentsFromFirestore((remoteStudents) => {
@@ -570,10 +590,12 @@ export default function App() {
           students={students}
           setIsMobileOpen={setIsMobileOpen}
           onRefreshData={handleRefreshData}
+          isCompactMode={isCompactMode}
+          setIsCompactMode={setIsCompactMode}
         />
 
         {/* Dynamic View Content */}
-        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className={`flex-1 ${isCompactMode ? 'p-2 text-xs max-w-full' : 'p-4 lg:p-8 max-w-7xl'} w-full mx-auto transition-all`}>
           {activeTab === 'dashboard' && userRole !== 'siswa' && (
             <DashboardView
               students={students}
@@ -683,6 +705,8 @@ export default function App() {
           )}
 
           {activeTab === 'mapelPilihan' && <MapelPilihanView userRole={userRole} />}
+
+          {activeTab === 'snbpCalc' && <SnbpCalculatorView students={students} userRole={userRole} />}
         </main>
       </div>
 

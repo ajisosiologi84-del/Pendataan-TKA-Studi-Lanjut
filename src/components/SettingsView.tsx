@@ -108,10 +108,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [gasUrlInput, setGasUrlInput] = useState(appsScriptUrl);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordSaveSuccess, setPasswordSaveSuccess] = useState(false);
 
   // System Passwords & Advanced Security States
   const [passwordsForm, setPasswordsForm] = useState<SystemPasswords>(() => getStoredSystemPasswords());
-  const [showPass, setShowPass] = useState({ superadmin: false, walikelas: false, bk: false });
+  const [showPass, setShowPass] = useState({ superadmin: false, walikelas: false, bk: false, proktor: false, teknisi: false });
   const [securityTab, setSecurityTab] = useState<'passwords' | 'matrix' | 'users' | 'policy' | 'sessions'>('passwords');
   
   const [rolePermissions, setRolePermissions] = useState<Record<string, RolePermissions>>(() => getStoredRolePermissions());
@@ -342,26 +344,63 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
-  const handleSavePasswords = (e: React.FormEvent) => {
+  const handleSavePasswords = async (e: React.FormEvent) => {
     e.preventDefault();
     setSecurityMessage(null);
 
-    if (passwordsForm.superadmin.trim().length < 4 || passwordsForm.walikelas.trim().length < 4 || passwordsForm.bk.trim().length < 4) {
-      setSecurityMessage('❌ Password minimal 4 karakter demi keamanan!');
+    const superadminPass = (passwordsForm.superadmin || '').trim();
+    const walikelasPass = (passwordsForm.walikelas || '').trim();
+    const bkPass = (passwordsForm.bk || '').trim();
+    const proktorPass = (passwordsForm.proktor || '').trim();
+    const teknisiPass = (passwordsForm.teknisi || '').trim();
+
+    if (
+      superadminPass.length < 2 ||
+      walikelasPass.length < 2 ||
+      bkPass.length < 2 ||
+      proktorPass.length < 2 ||
+      teknisiPass.length < 2
+    ) {
+      setSecurityMessage('❌ Password tidak boleh kosong atau terlalu pendek (minimal 2 karakter)!');
       return;
     }
 
-    saveSystemPasswords(passwordsForm);
-    addSecurityLog({
-      role: 'superadmin',
-      action: 'UPDATE_PASSWORDS',
-      category: 'SETTINGS',
-      status: 'SUCCESS',
-      details: 'Super Admin memperbarui password sistem untuk Super Admin, Wali Kelas, dan Guru BK',
-    });
+    const updatedPasswords: SystemPasswords = {
+      superadmin: superadminPass,
+      walikelas: walikelasPass,
+      bk: bkPass,
+      proktor: proktorPass,
+      teknisi: teknisiPass,
+    };
 
-    setSecurityMessage('✓ Password sistem berhasil diperbarui dan disimpan!');
-    setTimeout(() => setSecurityMessage(null), 4000);
+    setIsSavingPassword(true);
+
+    try {
+      saveSystemPasswords(updatedPasswords);
+      setPasswordsForm(updatedPasswords);
+
+      addSecurityLog({
+        role: 'superadmin',
+        action: 'UPDATE_PASSWORDS',
+        category: 'SETTINGS',
+        status: 'SUCCESS',
+        details: 'Super Admin memperbarui password sistem untuk Super Admin, Wali Kelas, Guru BK, Proktor, dan Teknisi',
+      });
+
+      // Brief delay for smooth loading animation
+      await new Promise((res) => setTimeout(res, 400));
+
+      setIsSavingPassword(false);
+      setPasswordSaveSuccess(true);
+      setSecurityMessage('✓ Password sistem berhasil diperbarui dan disinkronkan ke Firebase!');
+
+      setTimeout(() => setPasswordSaveSuccess(false), 4000);
+      setTimeout(() => setSecurityMessage(null), 5000);
+    } catch (err) {
+      console.error('Gagal menyimpan password:', err);
+      setIsSavingPassword(false);
+      setSecurityMessage('❌ Gagal menyimpan password. Silakan coba beberapa saat lagi.');
+    }
   };
 
   const handleClearLogs = () => {
@@ -1417,7 +1456,128 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     })()}
                   </div>
                 </div>
+
+                {/* PROKTOR PASSWORD */}
+                <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs uppercase text-slate-900 flex items-center gap-1.5">
+                      <Laptop className="w-4 h-4 text-amber-600" /> Proktor
+                    </span>
+                    <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+                      Ujian & Lab TKA
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Akses pendataan laptop, sarana lab TKA, dan berita acara ujian.
+                  </p>
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-xs font-bold text-slate-700">Password Proktor</label>
+                    <div className="relative">
+                      <input
+                        type={showPass.proktor ? 'text' : 'password'}
+                        value={passwordsForm.proktor}
+                        onChange={(e) => setPasswordsForm({ ...passwordsForm, proktor: e.target.value })}
+                        className="w-full pl-3 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                        placeholder="Masukkan password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass({ ...showPass, proktor: !showPass.proktor })}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        {showPass.proktor ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {/* Password Strength Gauge */}
+                    {(() => {
+                      const st = calculatePasswordStrength(passwordsForm.proktor);
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-500 font-medium">Kekuatan Password:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold text-[9px] ${st.color}`}>{st.label}</span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex">
+                            <div className={`h-full transition-all duration-300 ${st.score >= 1 ? 'bg-rose-500' : ''}`} style={{ width: '25%' }}></div>
+                            <div className={`h-full transition-all duration-300 ${st.score >= 2 ? 'bg-amber-500' : ''}`} style={{ width: '25%' }}></div>
+                            <div className={`h-full transition-all duration-300 ${st.score >= 3 ? 'bg-emerald-500' : ''}`} style={{ width: '25%' }}></div>
+                            <div className={`h-full transition-all duration-300 ${st.score >= 4 ? 'bg-indigo-600' : ''}`} style={{ width: '25%' }}></div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* TEKNISI PASSWORD */}
+                <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs uppercase text-slate-900 flex items-center gap-1.5">
+                      <Laptop className="w-4 h-4 text-emerald-600" /> Teknisi
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                      Infrastruktur
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Akses pemeliharaan teknis perangkat keras dan pengecekan jaringan lab.
+                  </p>
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-xs font-bold text-slate-700">Password Teknisi</label>
+                    <div className="relative">
+                      <input
+                        type={showPass.teknisi ? 'text' : 'password'}
+                        value={passwordsForm.teknisi}
+                        onChange={(e) => setPasswordsForm({ ...passwordsForm, teknisi: e.target.value })}
+                        className="w-full pl-3 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Masukkan password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass({ ...showPass, teknisi: !showPass.teknisi })}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        {showPass.teknisi ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {/* Password Strength Gauge */}
+                    {(() => {
+                      const st = calculatePasswordStrength(passwordsForm.teknisi);
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-500 font-medium">Kekuatan Password:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold text-[9px] ${st.color}`}>{st.label}</span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex">
+                            <div className={`h-full transition-all duration-300 ${st.score >= 1 ? 'bg-rose-500' : ''}`} style={{ width: '25%' }}></div>
+                            <div className={`h-full transition-all duration-300 ${st.score >= 2 ? 'bg-amber-500' : ''}`} style={{ width: '25%' }}></div>
+                            <div className={`h-full transition-all duration-300 ${st.score >= 3 ? 'bg-emerald-500' : ''}`} style={{ width: '25%' }}></div>
+                            <div className={`h-full transition-all duration-300 ${st.score >= 4 ? 'bg-indigo-600' : ''}`} style={{ width: '25%' }}></div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
+
+              {passwordSaveSuccess && (
+                <div className="p-4 bg-emerald-600 text-white rounded-2xl shadow-xl flex items-center justify-between gap-3 transform transition-all duration-300 animate-bounce">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <CheckCircle2 className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm">Konfigurasi Password Berhasil Disimpan!</h4>
+                      <p className="text-xs text-emerald-100">Password untuk Super Admin, Wali Kelas, Guru BK, Proktor, dan Teknisi telah tersimpan ke sistem & Firebase Cloud Database.</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] uppercase font-mono font-bold bg-white/20 px-3 py-1 rounded-full shrink-0">
+                    SINKRON FIREBASE
+                  </span>
+                </div>
+              )}
 
               <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-xs text-indigo-900 flex items-center gap-2">
@@ -1426,9 +1586,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all shrink-0"
+                  disabled={isSavingPassword}
+                  className={`px-6 py-2.5 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all duration-300 shrink-0 ${
+                    passwordSaveSuccess
+                      ? 'bg-emerald-600 shadow-emerald-600/30 scale-105'
+                      : isSavingPassword
+                      ? 'bg-indigo-400 cursor-wait'
+                      : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 active:scale-95'
+                  }`}
                 >
-                  <Save className="w-4 h-4" /> Simpan Konfigurasi Password
+                  {isSavingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan Password...</span>
+                    </>
+                  ) : passwordSaveSuccess ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 animate-pulse text-white" />
+                      <span>Password Tersimpan! ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Simpan Konfigurasi Password</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1848,7 +2030,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <option value="superadmin">Super Admin</option>
                         <option value="walikelas">Wali Kelas</option>
                         <option value="bk">Guru BK</option>
-                        <option value="panitia">Panitia / Proktor</option>
+                        <option value="proktor">Proktor</option>
+                        <option value="teknisi">Teknisi</option>
+                        <option value="panitia">Panitia</option>
                         <option value="read_only">Read Only</option>
                       </select>
                     </div>

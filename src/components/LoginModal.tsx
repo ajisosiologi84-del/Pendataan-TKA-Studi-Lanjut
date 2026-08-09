@@ -5,12 +5,12 @@ import { getStoredSystemPasswords, getStoredSecurityPolicy, getStoredCustomUsers
 import { sanitizeNis } from '../utils/sanitizer';
 
 interface LoginModalProps {
-  onLogin: (role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa', nis?: string) => void;
+  onLogin: (role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'teknisi' | 'siswa', nis?: string) => void;
   students: Student[];
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => {
-  const [selectedRole, setSelectedRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa'>('superadmin');
+  const [selectedRole, setSelectedRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'teknisi' | 'siswa'>('superadmin');
   const [passwordInput, setPasswordInput] = useState('');
   const [nisInput, setNisInput] = useState('');
   const [studentPasswordInput, setStudentPasswordInput] = useState('');
@@ -62,6 +62,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
       if (passwordInput === expectedPassword) isSuccess = true;
     } else if (selectedRole === 'proktor') {
       expectedPassword = storedPasswords.proktor || 'proktor123';
+      if (passwordInput === expectedPassword) isSuccess = true;
+    } else if (selectedRole === 'teknisi') {
+      expectedPassword = storedPasswords.teknisi || 'teknisi123';
       if (passwordInput === expectedPassword) isSuccess = true;
     }
 
@@ -215,10 +218,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
         {/* Role Selection Tabs */}
         <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
             <button
               onClick={() => { setSelectedRole('superadmin'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'superadmin'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -230,7 +233,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
             <button
               onClick={() => { setSelectedRole('walikelas'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'walikelas'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -242,7 +245,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
             <button
               onClick={() => { setSelectedRole('bk'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'bk'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -254,19 +257,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
             <button
               onClick={() => { setSelectedRole('proktor'); setErrorMsg(null); setPasswordInput(''); }}
-              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'proktor'
                   ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               <Laptop className="w-4 h-4" />
-              <span>Proktor/Teknisi</span>
+              <span>Proktor</span>
+            </button>
+
+            <button
+              onClick={() => { setSelectedRole('teknisi'); setErrorMsg(null); setPasswordInput(''); }}
+              className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${
+                selectedRole === 'teknisi'
+                  ? 'bg-amber-700 text-white shadow-md shadow-amber-700/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Laptop className="w-4 h-4" />
+              <span>Teknisi</span>
             </button>
 
             <button
               onClick={() => { setSelectedRole('siswa'); setErrorMsg(null); setNisInput(''); setStudentPasswordInput(''); }}
-              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 ${
+              className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${
                 selectedRole === 'siswa'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'

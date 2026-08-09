@@ -433,6 +433,7 @@ export interface SystemPasswords {
   walikelas: string;
   bk: string;
   proktor: string;
+  teknisi: string;
 }
 
 export const DEFAULT_SYSTEM_PASSWORDS: SystemPasswords = {
@@ -440,6 +441,7 @@ export const DEFAULT_SYSTEM_PASSWORDS: SystemPasswords = {
   walikelas: 'walikelas',
   bk: 'bk',
   proktor: 'proktor123',
+  teknisi: 'teknisi123',
 };
 
 export function getStoredSystemPasswords(): SystemPasswords {
@@ -457,10 +459,12 @@ export function getStoredSystemPasswords(): SystemPasswords {
   }
 }
 
-export function saveSystemPasswords(passwords: SystemPasswords): void {
+export function saveSystemPasswords(passwords: SystemPasswords, syncRemote = true): void {
   try {
     localStorage.setItem(SYSTEM_PASSWORDS_KEY, JSON.stringify(passwords));
-    syncSystemSettingsToFirestore('passwords', passwords);
+    if (syncRemote) {
+      syncSystemSettingsToFirestore('passwords', passwords);
+    }
   } catch (error) {
     console.error('Error saving system passwords:', error);
   }
@@ -593,6 +597,30 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissions> = {
     canManageUsers: false,
     canResetDatabase: false,
   },
+  proktor: {
+    canEditStudent: false,
+    canDeleteStudent: false,
+    canExportData: true,
+    canImportData: false,
+    canManageLaptops: true,
+    canManageSettings: false,
+    canViewAuditLogs: false,
+    canAccessBanPt: true,
+    canManageUsers: false,
+    canResetDatabase: false,
+  },
+  teknisi: {
+    canEditStudent: false,
+    canDeleteStudent: false,
+    canExportData: true,
+    canImportData: false,
+    canManageLaptops: true,
+    canManageSettings: false,
+    canViewAuditLogs: false,
+    canAccessBanPt: true,
+    canManageUsers: false,
+    canResetDatabase: false,
+  },
 };
 
 export const DEFAULT_SECURITY_POLICY: SystemSecurityPolicy = {
@@ -642,6 +670,28 @@ export const DEFAULT_CUSTOM_USERS: CustomUserAccount[] = [
     createdAt: '2026-01-15',
     lastLogin: '2026-08-08 09:15'
   },
+  {
+    id: 'usr-proktor-1',
+    username: 'proktor.lab1',
+    fullName: 'Drs. H. Ahmad Fauzi (Proktor Lab 1)',
+    role: 'proktor',
+    passwordHash: 'proktor123',
+    status: 'AKTIF',
+    kelasAkses: 'ALL',
+    createdAt: '2026-01-15',
+    lastLogin: '2026-08-08 08:00'
+  },
+  {
+    id: 'usr-teknisi-1',
+    username: 'teknisi.lab1',
+    fullName: 'Budi Santoso, S.Kom (Teknisi Lab 1)',
+    role: 'teknisi',
+    passwordHash: 'teknisi123',
+    status: 'AKTIF',
+    kelasAkses: 'ALL',
+    createdAt: '2026-01-15',
+    lastLogin: '2026-08-08 08:00'
+  },
 ];
 
 export function getStoredRolePermissions(): Record<string, RolePermissions> {
@@ -658,10 +708,12 @@ export function getStoredRolePermissions(): Record<string, RolePermissions> {
   }
 }
 
-export function saveRolePermissions(matrix: Record<string, RolePermissions>): void {
+export function saveRolePermissions(matrix: Record<string, RolePermissions>, syncRemote = true): void {
   try {
     localStorage.setItem(ACCESS_MATRIX_KEY, JSON.stringify(matrix));
-    syncSystemSettingsToFirestore('rolePermissions', matrix);
+    if (syncRemote) {
+      syncSystemSettingsToFirestore('rolePermissions', matrix);
+    }
   } catch (error) {
     console.error('Error saving role permissions:', error);
   }
@@ -681,10 +733,12 @@ export function getStoredSecurityPolicy(): SystemSecurityPolicy {
   }
 }
 
-export function saveSecurityPolicy(policy: SystemSecurityPolicy): void {
+export function saveSecurityPolicy(policy: SystemSecurityPolicy, syncRemote = true): void {
   try {
     localStorage.setItem(SECURITY_POLICY_KEY, JSON.stringify(policy));
-    syncSystemSettingsToFirestore('securityPolicy', policy);
+    if (syncRemote) {
+      syncSystemSettingsToFirestore('securityPolicy', policy);
+    }
   } catch (error) {
     console.error('Error saving security policy:', error);
   }
@@ -705,10 +759,12 @@ export function getStoredCustomUsers(): CustomUserAccount[] {
   }
 }
 
-export function saveCustomUsers(users: CustomUserAccount[]): void {
+export function saveCustomUsers(users: CustomUserAccount[], syncRemote = true): void {
   try {
     localStorage.setItem(CUSTOM_USERS_KEY, JSON.stringify(users));
-    syncSystemSettingsToFirestore('customUsers', users);
+    if (syncRemote) {
+      syncSystemSettingsToFirestore('customUsers', users);
+    }
   } catch (error) {
     console.error('Error saving custom users:', error);
   }

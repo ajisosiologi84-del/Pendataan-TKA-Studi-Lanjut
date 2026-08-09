@@ -17,6 +17,7 @@ import {
   UserCheck,
   Award,
   BookOpen,
+  Calculator,
 } from 'lucide-react';
 import { NavigationTab } from '../types';
 
@@ -80,6 +81,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <BookOpen className="w-5 h-5" />,
       badge: 'SNBP',
       description: 'Matriks Mapel Pendukung Prodi PTN',
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
+    },
+    {
+      id: 'snbpCalc',
+      label: 'SIMULASI KALKULATOR SNBP',
+      icon: <Calculator className="w-5 h-5" />,
+      badge: 'KALKULATOR',
+      description: 'Hitung Rasionalisasi & Peluang Lolos SNBP',
       roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
     },
     {

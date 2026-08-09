@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Plus, Download, RefreshCw, Database } from 'lucide-react';
+import { Menu, Plus, Download, RefreshCw, Database, Minimize2, Maximize2 } from 'lucide-react';
 import { NavigationTab, Student } from '../types';
 import { exportStudentsToCSV } from '../utils/storage';
 
@@ -9,6 +9,8 @@ interface HeaderProps {
   students: Student[];
   setIsMobileOpen: (open: boolean) => void;
   onRefreshData?: () => void;
+  isCompactMode?: boolean;
+  setIsCompactMode?: (compact: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   students,
   setIsMobileOpen,
   onRefreshData,
+  isCompactMode,
+  setIsCompactMode,
 }) => {
   const getTabTitle = () => {
     switch (activeTab) {
@@ -60,6 +64,11 @@ export const Header: React.FC<HeaderProps> = ({
           title: 'Mata Pelajaran Pilihan Pendukung Program Studi',
           subtitle: 'Matriks kesesuaian mata pelajaran SMA dengan program studi perguruan tinggi (SNBP / Kurikulum Merdeka)',
         };
+      case 'snbpCalc':
+        return {
+          title: 'Simulasi Kalkulator Rasionalisasi SNBP 2026',
+          subtitle: 'Kalkulator matematis estimasi skor & peluang lolos seleksi nasional berbasis prestasi',
+        };
       default:
         return { title: 'Pendataan Siswa', subtitle: 'Aplikasi Administrasi' };
     }
@@ -81,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg lg:text-xl font-bold text-slate-800 tracking-tight">
+            <h2 className="text-base lg:text-xl font-bold text-slate-800 tracking-tight">
               {title}
             </h2>
             <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Terhubung ke Firebase Firestore Cloud Database">
@@ -95,6 +104,21 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center space-x-2">
+        {setIsCompactMode && (
+          <button
+            onClick={() => setIsCompactMode(!isCompactMode)}
+            className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              isCompactMode
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+            title="Minimize / Mode Ringkas untuk Tampilan Mobile & Tablet Portrait"
+          >
+            {isCompactMode ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
+            <span className="hidden md:inline">{isCompactMode ? 'Perbesar' : 'Mode Ringkas'}</span>
+          </button>
+        )}
+
         {onRefreshData && (
           <button
             onClick={onRefreshData}

@@ -39,7 +39,7 @@ export interface Student {
   updatedAt: string;
 }
 
-export type NavigationTab = 'dashboard' | 'students' | 'form' | 'analysis' | 'appscript' | 'laptop' | 'settings' | 'banpt' | 'mapelPilihan';
+export type NavigationTab = 'dashboard' | 'students' | 'form' | 'analysis' | 'appscript' | 'laptop' | 'settings' | 'banpt' | 'mapelPilihan' | 'snbpCalc';
 
 export type StatusKelayakanLaptop = 'LAYAK' | 'TIDAK LAYAK';
 
@@ -120,7 +120,7 @@ export interface CustomUserAccount {
   id: string;
   username: string; // NIP / Username / Email
   fullName: string;
-  role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'panitia' | 'read_only';
+  role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'teknisi' | 'panitia' | 'read_only';
   passwordHash: string;
   status: 'AKTIF' | 'NONAKTIF' | 'LOCKED';
   kelasAkses?: string; // e.g., "XII MIPA 1" or "ALL"
