@@ -6,6 +6,7 @@ import {
   updateStudent,
   deleteStudent,
   resetToDefaultData,
+  clearAllStudentsData,
   getAppsScriptUrl,
   saveAppsScriptUrl,
   getStoredLaptops,
@@ -616,6 +617,17 @@ export default function App() {
                 setActiveTab('form');
               }}
               onResetData={handleResetData}
+              onClearData={() => {
+                const cleared = clearAllStudentsData();
+                setStudents(cleared);
+                addSecurityLog({
+                  role: userRole,
+                  action: 'CLEAR_ALL_STUDENTS',
+                  category: 'SYSTEM',
+                  status: 'WARNING',
+                  details: 'Pengguna mengosongkan seluruh database siswa (menghapus data dummy)',
+                });
+              }}
               onRefreshData={handleRefreshData}
               isReadOnly={userRole === 'walikelas' || userRole === 'bk'}
             />
@@ -681,6 +693,17 @@ export default function App() {
               onResetStudentsData={() => {
                 const refreshed = resetToDefaultData();
                 setStudents(refreshed);
+              }}
+              onClearStudentsData={() => {
+                const cleared = clearAllStudentsData();
+                setStudents(cleared);
+                addSecurityLog({
+                  role: 'superadmin',
+                  action: 'CLEAR_ALL_STUDENTS',
+                  category: 'SYSTEM',
+                  status: 'WARNING',
+                  details: 'Super Admin mengosongkan seluruh database siswa (menghapus data dummy)',
+                });
               }}
               onResetLaptopsData={handleResetLaptops}
               totalStudents={students.length}

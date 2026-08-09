@@ -19,7 +19,9 @@ import {
   Layers,
   Search,
   User,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { Student } from '../types';
 
@@ -264,6 +266,50 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
     window.print();
   };
 
+  const [isClearingForm, setIsClearingForm] = useState(false);
+  const [clearingProgress, setClearingProgress] = useState(0);
+
+  const handleResetForm = () => {
+    setIsClearingForm(true);
+    setClearingProgress(15);
+
+    setTimeout(() => {
+      setClearingProgress(60);
+    }, 250);
+
+    setTimeout(() => {
+      setClearingProgress(100);
+    }, 550);
+
+    setTimeout(() => {
+      setSelectedStudentId('');
+      setNamaSiswa('');
+      setSekolah('');
+      setAkreditasiSekolah('A');
+      setIndeksAlumni(80);
+      setSem1(0);
+      setSem2(0);
+      setSem3(0);
+      setSem4(0);
+      setSem5(0);
+      setMapelPendukung1('');
+      setNilaiMapel1(0);
+      setMapelPendukung2('');
+      setNilaiMapel2(0);
+      setPrestasiTingkat('Tidak Ada');
+      setPrestasiJuara('Peserta / Finalis');
+      setJenisPrestasi('Akademik');
+      setPtn1('');
+      setProdi1('');
+      setKeketatan1(2.5);
+      setPtn2('');
+      setProdi2('');
+      setKeketatan2(3.0);
+
+      setIsClearingForm(false);
+    }, 950);
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header Banner */}
@@ -282,8 +328,17 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 print:hidden">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 print:hidden">
             <button
+              type="button"
+              onClick={handleResetForm}
+              className="px-4 py-2.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 rounded-xl text-xs font-bold flex items-center gap-2 border border-rose-400/30 backdrop-blur-sm transition-all"
+              title="Kosongkan seluruh nilai dan pilihan prodi di form simulasi"
+            >
+              <RotateCcw className="w-4 h-4" /> Kosongkan Form Simulasi
+            </button>
+            <button
+              type="button"
               onClick={handlePrintReport}
               className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-2 border border-white/20 backdrop-blur-sm transition-all"
             >
@@ -881,6 +936,52 @@ export const SnbpCalculatorView: React.FC<SnbpCalculatorViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Animated Process Modal Overlay for SNBP Form Clear */}
+      {isClearingForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-5 border border-slate-200">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              {clearingProgress < 100 ? (
+                <>
+                  <div className="absolute inset-0 rounded-full border-4 border-rose-100 border-t-rose-600 animate-spin" />
+                  <Trash2 className="w-7 h-7 text-rose-600 animate-pulse" />
+                </>
+              ) : (
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 animate-bounce">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-base text-slate-800">
+                Membersihkan Data Simulasi SNBP...
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {clearingProgress < 50
+                  ? 'Menghapus nilai rapor & pilihan prodi...'
+                  : clearingProgress < 100
+                  ? 'Mereset parameter kalkulator rasionalisasi...'
+                  : 'Selesai! Form simulasi telah dibersihkan.'}
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                <div
+                  className="h-full bg-rose-500 rounded-full transition-all duration-300"
+                  style={{ width: `${clearingProgress}%` }}
+                />
+              </div>
+              <div className="text-[10px] font-mono text-slate-400 font-bold text-right">
+                {clearingProgress}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

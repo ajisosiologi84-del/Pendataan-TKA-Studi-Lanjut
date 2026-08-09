@@ -811,6 +811,16 @@ export function clearActiveSessionsExceptCurrent(): void {
   }
 }
 
+export function clearAllStudentsData(): Student[] {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } catch (error) {
+    console.error('Error clearing all student data:', error);
+  }
+  return [];
+}
+
+
 
 
 

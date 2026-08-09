@@ -36,6 +36,7 @@ interface StudentListProps {
   onSelectStudentDetail: (student: Student) => void;
   onAddNewStudent: () => void;
   onResetData: () => void;
+  onClearData?: () => void;
   onRefreshData?: () => void;
   isReadOnly?: boolean;
 }
@@ -47,6 +48,7 @@ export const StudentList: React.FC<StudentListProps> = ({
   onSelectStudentDetail,
   onAddNewStudent,
   onResetData,
+  onClearData,
   onRefreshData,
   isReadOnly = false,
 }) => {
@@ -61,6 +63,64 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Animated process state for clearing/resetting dummy data
+  const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
+  const [processType, setProcessType] = useState<'clear' | 'reset' | null>(null);
+  const [processProgress, setProcessProgress] = useState(0);
+  const [processStepText, setProcessStepText] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState<'clear' | 'reset' | null>(null);
+
+  const startAnimatedProcess = (type: 'clear' | 'reset') => {
+    setShowConfirmModal(null);
+    setProcessType(type);
+    setIsProcessModalOpen(true);
+    setProcessProgress(10);
+    setProcessStepText(
+      type === 'clear'
+        ? 'Menyiapkan pembersihan data dummy siswa TKA...'
+        : 'Menyiapkan pemulihan 13 data sampel dummy bawaan...'
+    );
+
+    setTimeout(() => {
+      setProcessProgress(40);
+      setProcessStepText(
+        type === 'clear'
+          ? 'Menghapus 13 record siswa dummy TKA dari penyimpanan...'
+          : 'Memuat data sampel siswa TKA & target studi lanjut...'
+      );
+    }, 350);
+
+    setTimeout(() => {
+      setProcessProgress(80);
+      setProcessStepText(
+        type === 'clear'
+          ? 'Membersihkan indeks data & riwayat simulasi...'
+          : 'Menyinkronkan data sampel ke penyimpanan...'
+      );
+    }, 750);
+
+    setTimeout(() => {
+      setProcessProgress(100);
+      setProcessStepText(
+        type === 'clear'
+          ? 'Selesai! Seluruh data dummy siswa berhasil dikosongkan.'
+          : 'Selesai! 13 Data sampel dummy berhasil dimuat kembali.'
+      );
+    }, 1150);
+
+    setTimeout(() => {
+      if (type === 'clear' && onClearData) {
+        onClearData();
+        showToast('Seluruh data dummy siswa berhasil dikosongkan (0 siswa)!');
+      } else if (type === 'reset') {
+        onResetData();
+        showToast('Data siswa berhasil direset ke 13 data sampel bawaan.');
+      }
+      setIsProcessModalOpen(false);
+      setProcessType(null);
+    }, 1650);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -208,13 +268,33 @@ export const StudentList: React.FC<StudentListProps> = ({
             </button>
 
             {!isReadOnly && (
-              <button
-                onClick={onAddNewStudent}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Tambah Siswa</span>
-              </button>
+              <>
+                {onClearData && (
+                  <button
+                    onClick={() => setShowConfirmModal('clear')}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl border border-rose-200 transition-colors"
+                    title="Kosongkan seluruh data dummy siswa TKA"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Kosongkan Dummy</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowConfirmModal('reset')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl border border-amber-200 transition-colors"
+                  title="Reset ke 13 data sampel bawaan"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Reset 13 Sampel</span>
+                </button>
+                <button
+                  onClick={onAddNewStudent}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Tambah Siswa</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -646,14 +726,118 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
 
         {!isReadOnly && (
-          <button
-            onClick={onResetData}
-            className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 underline font-medium"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Reset ke Data Contoh Bawaan
-          </button>
+          <div className="flex items-center gap-3">
+            {onClearData && (
+              <button
+                onClick={() => setShowConfirmModal('clear')}
+                className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 underline font-semibold"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Kosongkan Data Dummy (0 Siswa)
+              </button>
+            )}
+            <button
+              onClick={() => setShowConfirmModal('reset')}
+              className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 underline font-medium"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Reset ke 13 Data Sampel
+            </button>
+          </div>
         )}
       </div>
+
+      {/* Confirmation Modal for Clear or Reset */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                  showConfirmModal === 'clear' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
+                }`}
+              >
+                {showConfirmModal === 'clear' ? <Trash2 className="w-5 h-5" /> : <RotateCcw className="w-5 h-5" />}
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  {showConfirmModal === 'clear'
+                    ? 'Kosongkan Seluruh Data Dummy Siswa?'
+                    : 'Reset ke 13 Data Sampel Dummy?'}
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {showConfirmModal === 'clear'
+                    ? 'Tindakan ini akan mengosongkan seluruh record siswa dummy TKA (menjadi 0 siswa) agar Anda dapat menginput data riil sekolah.'
+                    : 'Tindakan ini akan mengembalikan data ke 13 data contoh sampel bawaan.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowConfirmModal(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => startAnimatedProcess(showConfirmModal)}
+                className={`px-4 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all ${
+                  showConfirmModal === 'clear' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                {showConfirmModal === 'clear' ? 'Ya, Kosongkan Sekarang' : 'Ya, Reset Data Sampel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animated Process Modal Overlay */}
+      {isProcessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-5 border border-slate-200">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              {processProgress < 100 ? (
+                <>
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" />
+                  {processType === 'clear' ? (
+                    <Trash2 className="w-7 h-7 text-rose-600 animate-pulse" />
+                  ) : (
+                    <RotateCcw className="w-7 h-7 text-amber-600 animate-spin" style={{ animationDuration: '2s' }} />
+                  )}
+                </>
+              ) : (
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 animate-bounce">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-base text-slate-800">
+                {processType === 'clear' ? 'Memproses Pengosongan Data Dummy...' : 'Memuat Data Sampel...'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium min-h-[32px] flex items-center justify-center leading-snug px-2">
+                {processStepText}
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    processType === 'clear' ? 'bg-rose-500' : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${processProgress}%` }}
+                />
+              </div>
+              <div className="text-[10px] font-mono text-slate-400 font-bold text-right">
+                {processProgress}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Excel Modal */}
       <ImportExcelModal

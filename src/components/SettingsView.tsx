@@ -81,6 +81,7 @@ interface SettingsViewProps {
   appsScriptUrl: string;
   onSaveAppsScriptUrl: (url: string) => void;
   onResetStudentsData: () => void;
+  onClearStudentsData?: () => void;
   onResetLaptopsData: () => void;
   totalStudents: number;
   totalLaptops: number;
@@ -98,6 +99,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   appsScriptUrl,
   onSaveAppsScriptUrl,
   onResetStudentsData,
+  onClearStudentsData,
   onResetLaptopsData,
   totalStudents,
   totalLaptops,
@@ -132,6 +134,60 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     status: 'AKTIF' as CustomUserAccount['status'],
     kelasAkses: 'ALL',
   });
+
+  // Animated process state for clearing/resetting dummy data in Settings
+  const [isSettingsProcessModalOpen, setIsSettingsProcessModalOpen] = useState(false);
+  const [settingsProcessType, setSettingsProcessType] = useState<'clear' | 'reset' | null>(null);
+  const [settingsProcessProgress, setSettingsProcessProgress] = useState(0);
+  const [settingsProcessStepText, setSettingsProcessStepText] = useState('');
+
+  const handleRunAnimatedProcess = (type: 'clear' | 'reset') => {
+    setSettingsProcessType(type);
+    setIsSettingsProcessModalOpen(true);
+    setSettingsProcessProgress(10);
+    setSettingsProcessStepText(
+      type === 'clear'
+        ? 'Menyiapkan pembersihan data dummy siswa TKA...'
+        : 'Menyiapkan pemulihan 13 data sampel dummy bawaan...'
+    );
+
+    setTimeout(() => {
+      setSettingsProcessProgress(40);
+      setSettingsProcessStepText(
+        type === 'clear'
+          ? 'Menghapus 13 record siswa dummy TKA dari penyimpanan...'
+          : 'Memuat data sampel siswa TKA & target studi lanjut...'
+      );
+    }, 350);
+
+    setTimeout(() => {
+      setSettingsProcessProgress(80);
+      setSettingsProcessStepText(
+        type === 'clear'
+          ? 'Membersihkan indeks data & riwayat simulasi...'
+          : 'Menyinkronkan data sampel ke penyimpanan...'
+      );
+    }, 750);
+
+    setTimeout(() => {
+      setSettingsProcessProgress(100);
+      setSettingsProcessStepText(
+        type === 'clear'
+          ? 'Selesai! Seluruh data dummy siswa berhasil dikosongkan.'
+          : 'Selesai! 13 Data sampel dummy berhasil dimuat kembali.'
+      );
+    }, 1150);
+
+    setTimeout(() => {
+      if (type === 'clear' && onClearStudentsData) {
+        onClearStudentsData();
+      } else if (type === 'reset') {
+        onResetStudentsData();
+      }
+      setIsSettingsProcessModalOpen(false);
+      setSettingsProcessType(null);
+    }, 1650);
+  };
 
   // Password Strength Calculation Helper
   const calculatePasswordStrength = (pass: string) => {
@@ -1158,19 +1214,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Reset seluruh data siswa kembali ke data sampel bawaan awal (untuk pengujian atau pemulihan data).
+                Kosongkan seluruh data dummy untuk memasukkan data siswa riil sekolah, atau reset kembali ke 13 data sampel bawaan awal.
               </p>
-              <button
-                onClick={() => {
-                  if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mereset seluruh data siswa ke data bawaan awal? Data baru yang diinput akan hilang.')) {
-                    onResetStudentsData();
-                    alert('Data siswa berhasil direset ke default.');
-                  }
-                }}
-                className="w-py px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
-              >
-                <RotateCcw className="w-4 h-4" /> Reset Data Siswa ke Default
-              </button>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    if (window.confirm('KONFIRMASI: Apakah Anda yakin ingin MENGOSONGKAN SELURUH DATA SISWA (menghapus data dummy)? Seluruh record siswa akan dihapus (0 siswa).')) {
+                      handleRunAnimatedProcess('clear');
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Kosongkan Seluruh Data Dummy Siswa
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mereset seluruh data siswa ke 13 data bawaan sampel awal?')) {
+                      handleRunAnimatedProcess('reset');
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset ke 13 Data Sampel
+                </button>
+              </div>
             </div>
 
             <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50 space-y-3">
@@ -2256,6 +2323,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Animated Process Modal Overlay for Settings */}
+      {isSettingsProcessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-5 border border-slate-200">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              {settingsProcessProgress < 100 ? (
+                <>
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" />
+                  {settingsProcessType === 'clear' ? (
+                    <Trash2 className="w-7 h-7 text-rose-600 animate-pulse" />
+                  ) : (
+                    <RotateCcw className="w-7 h-7 text-amber-600 animate-spin" style={{ animationDuration: '2s' }} />
+                  )}
+                </>
+              ) : (
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 animate-bounce">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-base text-slate-800">
+                {settingsProcessType === 'clear' ? 'Memproses Pengosongan Data Dummy...' : 'Memuat Data Sampel...'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium min-h-[32px] flex items-center justify-center leading-snug px-2">
+                {settingsProcessStepText}
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    settingsProcessType === 'clear' ? 'bg-rose-500' : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${settingsProcessProgress}%` }}
+                />
+              </div>
+              <div className="text-[10px] font-mono text-slate-400 font-bold text-right">
+                {settingsProcessProgress}%
+              </div>
+            </div>
           </div>
         </div>
       )}
