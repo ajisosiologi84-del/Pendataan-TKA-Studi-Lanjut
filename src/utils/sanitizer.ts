@@ -17,6 +17,16 @@ export function sanitizeNis(nis: string | undefined | null): string {
   return String(nis).replace(/[^a-zA-Z0-9.-]/g, '').trim();
 }
 
+export function formatNisn(nisn: string | number | undefined | null): string {
+  if (!nisn) return '';
+  let cleaned = String(nisn).replace(/^'/, '').trim();
+  // Indonesian NISN is a 10-digit number. If leading zero(s) were truncated (e.g. 86695501), pad to 10 digits
+  if (cleaned && /^\d+$/.test(cleaned) && cleaned.length < 10) {
+    cleaned = cleaned.padStart(10, '0');
+  }
+  return cleaned;
+}
+
 export function isValidNisFormat(nis: string): boolean {
   if (!nis || nis.trim().length === 0) return false;
   // NIS usually 3-15 characters alphanumeric

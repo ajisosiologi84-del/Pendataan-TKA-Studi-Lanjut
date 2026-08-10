@@ -52,6 +52,7 @@ import { MAPEL_TKA_OPTIONS, PRODI_POPULAR_OPTIONS, UNIVERSITAS_POPULAR_OPTIONS }
 import { MAPEL_PILIHAN_845_LIST, MapelPilihanData } from '../data/mapelPilihanData';
 import { SAMPLE_BANPT_DATA, findBanPtAccreditation, ProdiData } from '../data/banptData';
 import { getAppsScriptUrl } from '../utils/storage';
+import { formatNisn } from '../utils/sanitizer';
 import { StudentFormPdfModal } from './StudentFormPdfModal';
 
 export interface BanPtSelectionItem {
@@ -455,6 +456,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
 
     const payloadData = {
       ...formData,
+      nisn: formatNisn(formData.nisn),
       prodiPilihan1: finalProdi1,
       prodiPilihan2: finalProdi2,
       prestasiList: prestasiList.filter((p) => p.namaPrestasi.trim() !== ''),

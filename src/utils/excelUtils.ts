@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, PilihanStudiLanjutType, PrestasiItem } from '../types';
+import { formatNisn } from './sanitizer';
 
 export const EXCEL_HEADER_MAPPING: Record<string, keyof Omit<Student, 'id' | 'updatedAt'>> = {
   'Nama Siswa': 'namaSiswa',
@@ -208,7 +209,7 @@ export function exportStudentsToExcel(students: Student[]): void {
       'No': idx + 1,
       'Nama Siswa': s.namaSiswa,
       'NIS': s.nis,
-      'NISN': s.nisn,
+      'NISN': formatNisn(s.nisn),
       'Kelas': s.kelas,
       'Jenis Kelamin': s.jenisKelamin === 'L' ? 'Laki-laki (L)' : 'Perempuan (P)',
       'Mata Pelajaran TKA 1': s.mapelTka1,
@@ -322,7 +323,7 @@ export async function parseExcelFile(
 
             if (mappedField === 'namaSiswa') namaSiswa = val;
             else if (mappedField === 'nis') nis = val;
-            else if (mappedField === 'nisn') nisn = val;
+            else if (mappedField === 'nisn') nisn = formatNisn(val);
             else if (mappedField === 'kelas') {
               if (val) kelas = val;
             } else if (mappedField === 'jenisKelamin') {

@@ -36,6 +36,7 @@ import {
   getStoredMasterSchoolStudents,
   saveMasterSchoolStudents,
 } from './utils/storage';
+import { formatNisn } from './utils/sanitizer';
 import {
   subscribeStudentsFromFirestore,
   subscribeLaptopsFromFirestore,
@@ -127,9 +128,15 @@ export default function App() {
         }
         const studentData = json.students || json.data;
         if (studentData && Array.isArray(studentData) && studentData.length > 0) {
-          const cleanStudents = studentData.filter(
-            (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
-          );
+          const cleanStudents = studentData
+            .filter(
+              (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+            )
+            .map((s: any) => ({
+              ...s,
+              nis: s.nis ? String(s.nis).replace(/^'/, '').trim() : '',
+              nisn: formatNisn(s.nisn),
+            }));
           saveStudents(cleanStudents);
           setStudents(cleanStudents);
         }
@@ -523,11 +530,16 @@ export default function App() {
   };
 
   // Save / Update Student handler
-  const handleSaveStudent = (data: Omit<Student, 'id' | 'updatedAt'> | Student) => {
+  const handleSaveStudent = (dataInput: Omit<Student, 'id' | 'updatedAt'> | Student) => {
     if (userRole === 'walikelas' || userRole === 'bk') {
       alert('Akses ditolak: Wali Kelas dan Guru BK memiliki hak akses lihat (read-only).');
       return;
     }
+
+    const data = {
+      ...dataInput,
+      nisn: formatNisn(dataInput.nisn),
+    };
 
     let savedStudentObj: Student;
     const list = getStoredStudents();

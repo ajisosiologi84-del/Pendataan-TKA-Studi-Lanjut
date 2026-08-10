@@ -31,6 +31,7 @@ import {
   saveMasterSchoolStudents,
   DEFAULT_MASTER_SCHOOL_STUDENTS,
 } from '../utils/storage';
+import { formatNisn } from '../utils/sanitizer';
 
 interface SchoolDataViewProps {
   masterStudents: MasterSchoolStudent[];
@@ -232,7 +233,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
         ...editingItem,
         namaSiswa: formValues.namaSiswa.trim(),
         nis: formValues.nis.trim(),
-        nisn: formValues.nisn.trim(),
+        nisn: formatNisn(formValues.nisn),
         kelas: formValues.kelas.trim(),
       };
       updateMasterSchoolStudent(updatedItem);
@@ -241,7 +242,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
       const created = addMasterSchoolStudent({
         namaSiswa: formValues.namaSiswa.trim(),
         nis: formValues.nis.trim(),
-        nisn: formValues.nisn.trim(),
+        nisn: formatNisn(formValues.nisn),
         kelas: formValues.kelas.trim(),
       });
       setMasterStudents((prev) => [created, ...prev]);
@@ -308,7 +309,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
 
           const rawNama = String(row[namaKey] || '').trim();
           const rawNis = String(row[nisKey || ''] || '').trim();
-          const rawNisn = String(row[nisnKey || ''] || '').trim();
+          const rawNisn = formatNisn(row[nisnKey || '']);
           const rawKelas = String(row[kelasKey || ''] || 'XII MIPA 1').trim();
 
           if (rawNama) {
@@ -355,7 +356,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
       if (parts.length >= 3) {
         const rawNama = parts[0]?.trim() || '';
         const rawNis = parts[1]?.trim() || '';
-        const rawNisn = parts[2]?.trim() || '';
+        const rawNisn = formatNisn(parts[2]);
         const rawKelas = parts[3]?.trim() || 'XII MIPA 1';
 
         // Skip header line if present

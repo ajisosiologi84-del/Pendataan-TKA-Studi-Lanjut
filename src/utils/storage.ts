@@ -23,6 +23,7 @@ import {
 } from '../firebase';
 import { INITIAL_STUDENTS } from '../data/mockStudents';
 import { INITIAL_LAPTOPS } from '../data/mockLaptops';
+import { formatNisn } from './sanitizer';
 
 const STORAGE_KEY = 'tka_studi_lanjut_students_v1';
 const MASTER_SCHOOL_STUDENTS_KEY = 'tka_master_school_students_v1';
@@ -96,8 +97,9 @@ export function getStoredStudents(): Student[] {
         })
         .map((s: Student) => {
           const newK = sanitizeKelas(s.kelas);
-          if (newK !== s.kelas) kelasChanged = true;
-          return { ...s, kelas: newK };
+          const newNisn = formatNisn(s.nisn);
+          if (newK !== s.kelas || newNisn !== s.nisn) kelasChanged = true;
+          return { ...s, kelas: newK, nisn: newNisn };
         });
       if (clean.length !== parsed.length || kelasChanged) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
@@ -927,8 +929,9 @@ export function getStoredMasterSchoolStudents(): MasterSchoolStudent[] {
       let changed = false;
       const sanitized = parsed.map((item: MasterSchoolStudent) => {
         const newKelas = sanitizeKelas(item.kelas);
-        if (newKelas !== item.kelas) changed = true;
-        return { ...item, kelas: newKelas };
+        const newNisn = formatNisn(item.nisn);
+        if (newKelas !== item.kelas || newNisn !== item.nisn) changed = true;
+        return { ...item, kelas: newKelas, nisn: newNisn };
       });
       if (changed) {
         localStorage.setItem(MASTER_SCHOOL_STUDENTS_KEY, JSON.stringify(sanitized));

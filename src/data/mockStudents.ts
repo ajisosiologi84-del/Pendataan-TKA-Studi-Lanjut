@@ -352,6 +352,9 @@ function setupAllSheets() {
     sheetStudents.setFrozenRows(1);
   }
 
+  // Format NIS (Kolom C) dan NISN (Kolom D) sebagai Text (@) agar nol di depan tidak hilang di Google Sheets
+  sheetStudents.getRange("C:D").setNumberFormat("@");
+
   // 2. Sheet Pendataan Laptop & Sarana Ujian TKA
   let sheetLaptops = ss.getSheetByName(SHEET_LAPTOPS);
   if (!sheetLaptops) {
@@ -459,11 +462,17 @@ function parseStudentRow(row) {
     fotoVal = fotoVal.replace('=IMAGE("', '').replace('")', '');
   }
 
+  var parsedNis = row[2] ? row[2].toString().replace(/^'/, '').trim() : "";
+  var parsedNisn = row[3] ? row[3].toString().replace(/^'/, '').trim() : "";
+  if (parsedNisn && /^\d+$/.test(parsedNisn) && parsedNisn.length < 10) {
+    parsedNisn = parsedNisn.padStart(10, "0");
+  }
+
   return {
     id: row[0] ? row[0].toString() : "",
     namaSiswa: row[1] ? row[1].toString() : "",
-    nis: row[2] ? row[2].toString() : "",
-    nisn: row[3] ? row[3].toString() : "",
+    nis: parsedNis,
+    nisn: parsedNisn,
     kelas: row[4] ? row[4].toString() : "",
     jenisKelamin: row[5] ? row[5].toString() : "L",
     noHp: row[6] ? row[6].toString() : "",
@@ -629,8 +638,11 @@ function processFotoSiswa(fotoData, namaSiswa, nisn, nis) {
       var base64Str = parts[1] || parts[0];
       var decodedBytes = Utilities.base64Decode(base64Str);
       
-      var cleanNisn = (nisn || "").toString().trim().replace(/[^a-zA-Z0-9]/g, "");
-      var cleanNis = (nis || "").toString().trim().replace(/[^a-zA-Z0-9]/g, "");
+      var cleanNisn = (nisn || "").toString().replace(/^'/, '').trim().replace(/[^a-zA-Z0-9]/g, "");
+      if (cleanNisn && /^\d+$/.test(cleanNisn) && cleanNisn.length < 10) {
+        cleanNisn = cleanNisn.padStart(10, "0");
+      }
+      var cleanNis = (nis || "").toString().replace(/^'/, '').trim().replace(/[^a-zA-Z0-9]/g, "");
       var cleanNama = (namaSiswa || "pasfoto").toString().trim().replace(/[^a-zA-Z0-9]/g, "_");
       
       var fileNamePrefix = cleanNisn || cleanNis || "Siswa";
@@ -672,11 +684,21 @@ function handleStudentPost(sheet, action, contents) {
     var detailPrestasiJson = (student.prestasiList && Array.isArray(student.prestasiList)) ? JSON.stringify(student.prestasiList) : "";
     var fotoProcessed = processFotoSiswa(student.fotoSiswa, student.namaSiswa, student.nisn, student.nis);
 
+    var rawNis = student.nis ? student.nis.toString().replace(/^'/, '').trim() : "";
+    var rawNisn = student.nisn ? student.nisn.toString().replace(/^'/, '').trim() : "";
+
+    if (rawNisn && /^\d+$/.test(rawNisn) && rawNisn.length < 10) {
+      rawNisn = rawNisn.padStart(10, "0");
+    }
+
+    var formattedNis = rawNis ? ("'" + rawNis) : "";
+    var formattedNisn = rawNisn ? ("'" + rawNisn) : "";
+
     const rowData = [
       student.id || "std-" + Date.now(),
       student.namaSiswa || "",
-      student.nis || "",
-      student.nisn || "",
+      formattedNis,
+      formattedNisn,
       student.kelas || "",
       student.jenisKelamin || "L",
       student.noHp || "",
