@@ -118,16 +118,16 @@ export default function App() {
       }
 
       if (json && json.status === 'success') {
-        if (json.laptops && Array.isArray(json.laptops) && json.laptops.length > 0) {
+        if (json.laptops && Array.isArray(json.laptops)) {
           saveLaptops(json.laptops, false);
           setLaptops(json.laptops);
         }
-        if (json.proktorList && Array.isArray(json.proktorList) && json.proktorList.length > 0) {
+        if (json.proktorList && Array.isArray(json.proktorList)) {
           saveProktorTeknisi(json.proktorList, false);
           setProktorList(json.proktorList);
         }
         const studentData = json.students || json.data;
-        if (studentData && Array.isArray(studentData) && studentData.length > 0) {
+        if (studentData && Array.isArray(studentData)) {
           const cleanStudents = studentData
             .filter(
               (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
@@ -235,7 +235,7 @@ export default function App() {
 
     // Real-time listener for Laptops collection
     const unsubLaptops = subscribeLaptopsFromFirestore((remoteLaptops) => {
-      if (remoteLaptops && remoteLaptops.length > 0) {
+      if (Array.isArray(remoteLaptops)) {
         setLaptops(remoteLaptops);
         saveLaptops(remoteLaptops, false);
       }
@@ -447,6 +447,7 @@ export default function App() {
       alert('Akses ditolak: Wali Kelas dan Guru BK memiliki hak akses baca (read-only).');
       return;
     }
+    const targetLaptop = laptops.find((l) => l.id === id);
     deleteLaptop(id);
     setLaptops(getStoredLaptops());
 
@@ -455,7 +456,12 @@ export default function App() {
         fetch(appsScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ target: 'laptop', action: 'deleteLaptop', id }),
+          body: JSON.stringify({
+            target: 'laptop',
+            action: 'deleteLaptop',
+            id,
+            studentId: targetLaptop?.studentId,
+          }),
         }).catch((err) => console.log('Apps Script Laptop sync note:', err));
       } catch (err) {}
     }
@@ -625,6 +631,8 @@ export default function App() {
             target: 'student',
             action: 'delete',
             id,
+            nis: target?.nis,
+            nisn: target?.nisn,
           }),
         }).catch((err) => console.log('Apps Script Student delete note:', err));
       } catch (err) {}

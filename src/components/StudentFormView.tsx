@@ -288,14 +288,24 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       let initNisn = editingStudent.nisn || '';
       let initKelas = editingStudent.kelas || 'XII MIPA 1';
 
-      if (!initNama && initNis && masterStudents.length > 0) {
-        const masterFound = masterStudents.find((m) => m.nis === initNis || (m.nisn && m.nisn === initNis));
+      if (masterStudents.length > 0) {
+        const cleanNis = initNis.trim();
+        const cleanNisn = initNisn.trim();
+        const masterFound = masterStudents.find(
+          (m) =>
+            (cleanNis && m.nis && m.nis.toString().trim() === cleanNis) ||
+            (cleanNisn && m.nisn && m.nisn.toString().trim() === cleanNisn) ||
+            (cleanNis && m.nisn && m.nisn.toString().trim() === cleanNis) ||
+            (initNama && m.namaSiswa && m.namaSiswa.toLowerCase().trim() === initNama.toLowerCase().trim())
+        );
         if (masterFound) {
-          initNama = masterFound.namaSiswa;
+          setSelectedMasterId(masterFound.id);
+          if (!initNama || initNama === 'Siswa') initNama = masterFound.namaSiswa;
+          if (!initNis) initNis = masterFound.nis;
           if (!initNisn) initNisn = masterFound.nisn;
           if (masterFound.kelas) initKelas = masterFound.kelas;
           setAutoFillNotification(
-            `✓ Data Awal terisi otomatis dari Input Data Sekolah: ${masterFound.namaSiswa} (${initKelas}) - NIS: ${initNis}`
+            `⚡ Terhubung & Terisi Otomatis dari Input Data Sekolah: ${masterFound.namaSiswa} (${initKelas}) - NIS: ${masterFound.nis} | NISN: ${masterFound.nisn}`
           );
         }
       }
@@ -325,10 +335,37 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       });
       setPrestasiList(editingStudent.prestasiList || []);
     }
-  }, [editingStudent]);
+  }, [editingStudent, masterStudents]);
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+
+      // Real-time Auto-Fill lookup from Input Data Sekolah (masterStudents) based on NIS or NISN
+      if ((field === 'nis' || field === 'nisn') && value && masterStudents.length > 0) {
+        const cleanVal = String(value).trim();
+        if (cleanVal.length >= 2) {
+          const masterFound = masterStudents.find(
+            (m) =>
+              (m.nis && String(m.nis).trim() === cleanVal) ||
+              (m.nisn && String(m.nisn).trim() === cleanVal)
+          );
+          if (masterFound) {
+            setSelectedMasterId(masterFound.id);
+            if (masterFound.namaSiswa) updated.namaSiswa = masterFound.namaSiswa;
+            if (masterFound.nis) updated.nis = masterFound.nis;
+            if (masterFound.nisn) updated.nisn = masterFound.nisn;
+            if (masterFound.kelas) updated.kelas = masterFound.kelas;
+            setAutoFillNotification(
+              `⚡ Terhubung & Terisi Otomatis dari Input Data Sekolah: ${masterFound.namaSiswa} (${masterFound.kelas}) - NIS: ${masterFound.nis} | NISN: ${masterFound.nisn}`
+            );
+          } else {
+            setSelectedMasterId('');
+          }
+        }
+      }
+      return updated;
+    });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -878,6 +915,38 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                   placeholder="Contoh: 22231001"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
+                {(() => {
+                  const currentCleanNis = (formData.nis || '').trim();
+                  const matchedMaster = masterStudents.find(
+                    (m) =>
+                      (currentCleanNis && m.nis && m.nis.toString().trim() === currentCleanNis) ||
+                      (selectedMasterId && m.id === selectedMasterId)
+                  );
+                  if (matchedMaster) {
+                    return (
+                      <div className="mt-1.5 p-2 bg-indigo-50 border border-indigo-200 text-indigo-950 rounded-xl text-[11px] font-bold flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Terhubung: <strong>{matchedMaster.namaSiswa}</strong> ({matchedMaster.kelas})</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMasterStudent(matchedMaster.id)}
+                          className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-2 py-0.5 rounded-md transition-colors"
+                        >
+                          Sematkan
+                        </button>
+                      </div>
+                    );
+                  } else if (currentCleanNis.length >= 3 && masterStudents.length > 0) {
+                    return (
+                      <p className="mt-1 text-[10px] text-amber-700 font-medium">
+                        💡 NIS belum terdaftar di Master Data Sekolah (Super Admin).
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* NISN */}

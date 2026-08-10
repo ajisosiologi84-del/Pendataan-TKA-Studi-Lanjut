@@ -733,9 +733,18 @@ function handleStudentPost(sheet, action, contents) {
   
   if (action === "delete") {
     const studentId = contents.id;
+    const studentNis = contents.nis ? contents.nis.toString().replace(/^'/, '').trim() : "";
+    const studentNisn = contents.nisn ? contents.nisn.toString().replace(/^'/, '').trim() : "";
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0] == studentId || (contents.nis && data[i][2] == contents.nis)) {
+      var rowId = (data[i][0] || "").toString().trim();
+      var rowNis = (data[i][2] || "").toString().replace(/^'/, '').trim();
+      var rowNisn = (data[i][3] || "").toString().replace(/^'/, '').trim();
+      if (
+        (studentId && rowId == studentId) ||
+        (studentNis && rowNis == studentNis) ||
+        (studentNisn && rowNisn == studentNisn)
+      ) {
         sheet.deleteRow(i + 1);
         return responseJSON({ status: "success", message: "Data Siswa berhasil dihapus" });
       }
@@ -756,9 +765,10 @@ function handleStudentPost(sheet, action, contents) {
     const data = sheet.getDataRange().getValues();
     let count = 0;
     for (let i = data.length - 1; i >= 1; i--) {
-      var rowId = (data[i][0] || "").toString();
-      var rowNis = (data[i][2] || "").toString();
-      if (ids.indexOf(rowId) > -1 || ids.indexOf(rowNis) > -1) {
+      var rowId = (data[i][0] || "").toString().trim();
+      var rowNis = (data[i][2] || "").toString().replace(/^'/, '').trim();
+      var rowNisn = (data[i][3] || "").toString().replace(/^'/, '').trim();
+      if (ids.indexOf(rowId) > -1 || ids.indexOf(rowNis) > -1 || ids.indexOf(rowNisn) > -1) {
         sheet.deleteRow(i + 1);
         count++;
       }
@@ -812,9 +822,15 @@ function handleLaptopPost(sheet, action, contents) {
 
   if (action === "deleteLaptop" || action === "delete") {
     const laptopId = contents.id;
+    const studentId = contents.studentId;
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0] == laptopId) {
+      var rowId = (data[i][0] || "").toString().trim();
+      var rowStudentId = (data[i][1] || "").toString().trim();
+      if (
+        (laptopId && rowId == laptopId) ||
+        (studentId && rowStudentId == studentId)
+      ) {
         sheet.deleteRow(i + 1);
         return responseJSON({ status: "success", message: "Data Laptop berhasil dihapus" });
       }
