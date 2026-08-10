@@ -86,15 +86,20 @@ export function getStoredStudents(): Student[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      const clean = parsed.filter(
-        (s: Student) => {
+      let kelasChanged = false;
+      const clean = parsed
+        .filter((s: Student) => {
           if (!s || !s.id) return false;
           if (/^std-1[0-2][0-9]$/.test(s.id) || s.id === 'std-101') return false;
           if (isExcludedStudentName(s.namaSiswa)) return false;
           return true;
-        }
-      );
-      if (clean.length !== parsed.length) {
+        })
+        .map((s: Student) => {
+          const newK = sanitizeKelas(s.kelas);
+          if (newK !== s.kelas) kelasChanged = true;
+          return { ...s, kelas: newK };
+        });
+      if (clean.length !== parsed.length || kelasChanged) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
       }
       return clean;
@@ -888,15 +893,24 @@ export function clearActiveSessionsExceptCurrent(): void {
 
 // --- MASTER DATA SEKOLAH (NAMA, NIS, NISN, KELAS) ---
 export const DEFAULT_MASTER_SCHOOL_STUDENTS: MasterSchoolStudent[] = [
-  { id: 'mst-101', namaSiswa: 'Ahmad Fauzi', nis: '22231001', nisn: '0061234561', kelas: 'XII Merdeka 1' },
-  { id: 'mst-102', namaSiswa: 'Anisa Rahmawati', nis: '22231002', nisn: '0061234562', kelas: 'XII Merdeka 1' },
-  { id: 'mst-103', namaSiswa: 'Bintang Putra Pratama', nis: '22231003', nisn: '0061234563', kelas: 'XII Merdeka 2' },
-  { id: 'mst-104', namaSiswa: 'Citra Dewi Kartika', nis: '22231004', nisn: '0061234564', kelas: 'XII Merdeka 2' },
-  { id: 'mst-105', namaSiswa: 'Daffa Rizky Ramadhan', nis: '22231005', nisn: '0061234565', kelas: 'XII Merdeka 3' },
-  { id: 'mst-106', namaSiswa: 'Eka Nur Syamsiah', nis: '22231006', nisn: '0061234566', kelas: 'XII Merdeka 3' },
-  { id: 'mst-107', namaSiswa: 'Farhan Aditya Nugraha', nis: '22231007', nisn: '0061234567', kelas: 'XII Merdeka 4' },
-  { id: 'mst-108', namaSiswa: 'Gita Savitri Maharani', nis: '22231008', nisn: '0061234568', kelas: 'XII Merdeka 4' },
+  { id: 'mst-101', namaSiswa: 'Ahmad Fauzi', nis: '22231001', nisn: '0061234561', kelas: 'XII MIPA 1' },
+  { id: 'mst-102', namaSiswa: 'Anisa Rahmawati', nis: '22231002', nisn: '0061234562', kelas: 'XII MIPA 1' },
+  { id: 'mst-103', namaSiswa: 'Bintang Putra Pratama', nis: '22231003', nisn: '0061234563', kelas: 'XII MIPA 2' },
+  { id: 'mst-104', namaSiswa: 'Citra Dewi Kartika', nis: '22231004', nisn: '0061234564', kelas: 'XII MIPA 2' },
+  { id: 'mst-105', namaSiswa: 'Daffa Rizky Ramadhan', nis: '22231005', nisn: '0061234565', kelas: 'XII IPS 1' },
+  { id: 'mst-106', namaSiswa: 'Eka Nur Syamsiah', nis: '22231006', nisn: '0061234566', kelas: 'XII IPS 1' },
+  { id: 'mst-107', namaSiswa: 'Farhan Aditya Nugraha', nis: '22231007', nisn: '0061234567', kelas: 'XII IPS 2' },
+  { id: 'mst-108', namaSiswa: 'Gita Savitri Maharani', nis: '22231008', nisn: '0061234568', kelas: 'XII IPS 2' },
 ];
+
+export function sanitizeKelas(kelasStr?: string): string {
+  if (!kelasStr) return 'XII MIPA 1';
+  if (/merdeka\s*1/i.test(kelasStr)) return 'XII MIPA 1';
+  if (/merdeka\s*2/i.test(kelasStr)) return 'XII MIPA 2';
+  if (/merdeka\s*3/i.test(kelasStr)) return 'XII IPS 1';
+  if (/merdeka\s*4/i.test(kelasStr)) return 'XII IPS 2';
+  return kelasStr;
+}
 
 export function getStoredMasterSchoolStudents(): MasterSchoolStudent[] {
   try {
@@ -909,7 +923,19 @@ export function getStoredMasterSchoolStudents(): MasterSchoolStudent[] {
       return DEFAULT_MASTER_SCHOOL_STUDENTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEFAULT_MASTER_SCHOOL_STUDENTS;
+    if (Array.isArray(parsed)) {
+      let changed = false;
+      const sanitized = parsed.map((item: MasterSchoolStudent) => {
+        const newKelas = sanitizeKelas(item.kelas);
+        if (newKelas !== item.kelas) changed = true;
+        return { ...item, kelas: newKelas };
+      });
+      if (changed) {
+        localStorage.setItem(MASTER_SCHOOL_STUDENTS_KEY, JSON.stringify(sanitized));
+      }
+      return sanitized;
+    }
+    return DEFAULT_MASTER_SCHOOL_STUDENTS;
   } catch (error) {
     console.error('Error reading master school students:', error);
     return DEFAULT_MASTER_SCHOOL_STUDENTS;

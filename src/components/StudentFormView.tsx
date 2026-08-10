@@ -36,7 +36,9 @@ import {
   ChevronDown,
   ChevronUp,
   BookOpenCheck,
-  ListOrdered
+  ListOrdered,
+  ArrowLeft,
+  LogOut
 } from 'lucide-react';
 import {
   Student,
@@ -86,7 +88,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
     namaSiswa: '',
     nis: '',
     nisn: '',
-    kelas: 'XII Merdeka 1',
+    kelas: 'XII MIPA 1',
     jenisKelamin: 'L' as 'L' | 'P',
     mapelTka1: 'Matematika',
     mapelTka2: 'Fisika',
@@ -283,7 +285,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
       let initNama = editingStudent.namaSiswa || '';
       let initNis = editingStudent.nis || '';
       let initNisn = editingStudent.nisn || '';
-      let initKelas = editingStudent.kelas || 'XII Merdeka 1';
+      let initKelas = editingStudent.kelas || 'XII MIPA 1';
 
       if (!initNama && initNis && masterStudents.length > 0) {
         const masterFound = masterStudents.find((m) => m.nis === initNis || (m.nisn && m.nisn === initNis));
@@ -523,6 +525,18 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-300 shadow-2xs"
+                title="Keluar dari formulir"
+              >
+                <ArrowLeft className="w-4 h-4 text-slate-600" />
+                <span>Kembali</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setIsPdfModalOpen(true)}
@@ -889,10 +903,6 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                   onChange={(e) => handleChange('kelas', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 >
-                  <option value="XII Merdeka 1">XII Merdeka 1</option>
-                  <option value="XII Merdeka 2">XII Merdeka 2</option>
-                  <option value="XII Merdeka 3">XII Merdeka 3</option>
-                  <option value="XII Merdeka 4">XII Merdeka 4</option>
                   <option value="XII MIPA 1">XII MIPA 1</option>
                   <option value="XII MIPA 2">XII MIPA 2</option>
                   <option value="XII IPS 1">XII IPS 1</option>
@@ -2005,6 +2015,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
             prestasiList,
           }}
           onClose={() => setIsPdfModalOpen(false)}
+          onExitForm={onCancel}
         />
       )}
 
@@ -2287,12 +2298,26 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                 <span>Cetak / Pratinjau PDF Bukti Pendaftaran</span>
               </button>
 
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSuccessModalOpen(false);
+                    onCancel();
+                  }}
+                  className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 border border-rose-500/40"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Selesai & Keluar dari Formulir</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setIsSuccessModalOpen(false)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
               >
-                Tutup & Kembali ke Form
+                Tetap di Form (Edit Lagi)
               </button>
             </div>
 

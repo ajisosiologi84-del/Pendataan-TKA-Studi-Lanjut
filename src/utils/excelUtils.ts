@@ -111,7 +111,7 @@ export function downloadExcelTemplate(): void {
       'Nama Siswa': 'Contoh Budi Santoso',
       'NIS': '22231011',
       'NISN': '0061234571',
-      'Kelas': 'XII Merdeka 1',
+      'Kelas': 'XII MIPA 1',
       'Jenis Kelamin': 'L',
       'Mata Pelajaran TKA 1': 'Matematika',
       'Mata Pelajaran TKA 2': 'Fisika',
@@ -134,7 +134,7 @@ export function downloadExcelTemplate(): void {
       'Nama Siswa': 'Contoh Taruna Rian',
       'NIS': '22231012',
       'NISN': '0061234572',
-      'Kelas': 'XII Merdeka 2',
+      'Kelas': 'XII MIPA 2',
       'Jenis Kelamin': 'L',
       'Mata Pelajaran TKA 1': 'Biologi',
       'Mata Pelajaran TKA 2': 'Kimia',
@@ -295,7 +295,7 @@ export async function parseExcelFile(
           let namaSiswa = '';
           let nis = '';
           let nisn = '';
-          let kelas = 'XII Merdeka 1';
+          let kelas = 'XII MIPA 1';
           let jenisKelamin: 'L' | 'P' = 'L';
           let mapelTka1 = 'Matematika';
           let mapelTka2 = 'Fisika';

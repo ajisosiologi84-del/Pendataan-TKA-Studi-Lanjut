@@ -162,7 +162,7 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
   }>({
     studentId: '',
     namaSiswa: '',
-    kelas: 'XII Merdeka 1',
+    kelas: 'XII MIPA 1',
     gelombang: 'Gelombang 1 (26 - 29 Okt 2026)',
     merkLaptop: '',
     charger: true,
@@ -210,7 +210,7 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
     setLaptopFormData({
       studentId: '',
       namaSiswa: '',
-      kelas: 'XII Merdeka 1',
+      kelas: 'XII MIPA 1',
       gelombang: 'Gelombang 1 (26 - 29 Okt 2026)',
       merkLaptop: '',
       charger: true,
@@ -1470,7 +1470,7 @@ export const LaptopInventoryView: React.FC<LaptopInventoryViewProps> = ({
                     required
                     value={laptopFormData.kelas}
                     onChange={(e) => setLaptopFormData({ ...laptopFormData, kelas: e.target.value })}
-                    placeholder="Contoh: XII Merdeka 1"
+                    placeholder="Contoh: XII MIPA 1"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
                   />
                 </div>

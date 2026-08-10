@@ -343,7 +343,7 @@ export default function App() {
             namaSiswa: masterFound.namaSiswa,
             nis: masterFound.nis,
             nisn: masterFound.nisn,
-            kelas: masterFound.kelas || 'XII Merdeka 1',
+            kelas: masterFound.kelas || 'XII MIPA 1',
             jenisKelamin: 'L',
             mapelTka1: 'Matematika',
             mapelTka2: 'Fisika',
@@ -358,7 +358,7 @@ export default function App() {
             namaSiswa: '',
             nis: nis,
             nisn: '',
-            kelas: 'XII Merdeka 1',
+            kelas: 'XII MIPA 1',
             jenisKelamin: 'L',
             mapelTka1: 'Matematika',
             mapelTka2: 'Fisika',
@@ -530,83 +530,51 @@ export default function App() {
     }
 
     let savedStudentObj: Student;
-
-    if (userRole === 'siswa' && currentUserNis) {
-      const list = getStoredStudents();
-      const existing = list.find((s) => s.nis === currentUserNis);
-      const payload = { ...data, nis: currentUserNis };
-      if (existing) {
-        savedStudentObj = { ...existing, ...payload } as Student;
-        updateStudent(savedStudentObj);
-      } else {
-        const newObj: Student = {
-          id: 'std-' + Date.now(),
-          ...payload,
-          updatedAt: new Date().toISOString()
-        } as Student;
-        addStudent(newObj);
-        savedStudentObj = newObj;
-      }
-      addSecurityLog({
-        role: 'siswa',
-        userIdentifier: currentUserNis,
-        action: 'UPDATE_STUDENT_SELF',
-        category: 'DATA_CHANGE',
-        status: 'SUCCESS',
-        details: `Siswa memperbarui data mandiri (Nama: ${data.namaSiswa || 'Siswa'}, NIS: ${currentUserNis})`,
-      });
-      alert('Data Formulir Anda Berhasil Disimpan!');
-      const refreshed = getStoredStudents();
-      setStudents(refreshed);
-      const updatedCurrent = refreshed.find(s => s.nis === currentUserNis);
-      if (updatedCurrent) setEditingStudent(updatedCurrent);
-
-      // Apps Script Auto Sync
-      if (appsScriptUrl) {
-        try {
-          fetch(appsScriptUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-              target: 'student',
-              action: 'save',
-              student: savedStudentObj,
-            }),
-          }).catch((err) => console.log('Apps Script Student sync note:', err));
-        } catch (err) {}
-      }
-
-      return;
-    }
+    const list = getStoredStudents();
 
     if ('id' in data && data.id) {
-      savedStudentObj = data as Student;
+      savedStudentObj = {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      } as Student;
       updateStudent(savedStudentObj);
       addSecurityLog({
-        role: userRole || 'superadmin',
+        role: userRole || 'siswa',
+        userIdentifier: currentUserNis || undefined,
         action: 'UPDATE_STUDENT',
         category: 'DATA_CHANGE',
         status: 'SUCCESS',
         details: `Memperbarui data siswa (${data.namaSiswa}, NIS: ${data.nis})`,
       });
     } else {
-      const newObj: Student = {
-        id: 'std-' + Date.now(),
-        ...data,
-        updatedAt: new Date().toISOString()
-      } as Student;
-      addStudent(newObj);
-      savedStudentObj = newObj;
+      const existing = data.nis ? list.find((s) => s.nis === data.nis) : null;
+      if (existing) {
+        savedStudentObj = {
+          ...existing,
+          ...data,
+          updatedAt: new Date().toISOString(),
+        } as Student;
+        updateStudent(savedStudentObj);
+      } else {
+        const newObj: Student = {
+          id: 'std-' + Date.now(),
+          ...data,
+          updatedAt: new Date().toISOString(),
+        } as Student;
+        addStudent(newObj);
+        savedStudentObj = newObj;
+      }
       addSecurityLog({
-        role: userRole || 'superadmin',
+        role: userRole || 'siswa',
+        userIdentifier: currentUserNis || undefined,
         action: 'ADD_STUDENT',
         category: 'DATA_CHANGE',
         status: 'SUCCESS',
-        details: `Menambah siswa baru (${data.namaSiswa}, NIS: ${data.nis})`,
+        details: `Menambah/memperbarui data siswa (${data.namaSiswa || 'Siswa'}, NIS: ${data.nis || '-'})`,
       });
     }
 
-    // Apps Script Auto Sync
+    // Realtime Apps Script Auto Sync with Google Sheets
     if (appsScriptUrl) {
       try {
         fetch(appsScriptUrl, {
@@ -792,10 +760,6 @@ export default function App() {
       <Sidebar
         activeTab={activeTab}
         setActiveTab={(tab) => {
-          if (userRole === 'siswa' && tab !== 'form' && tab !== 'banpt' && tab !== 'mapelPilihan') {
-            alert('Siswa hanya dapat mengakses formulir pengisian data, Direktori BAN-PT, dan Mata Pelajaran Pilihan.');
-            return;
-          }
           setActiveTab(tab);
           if (tab !== 'form') setEditingStudent(null);
         }}
@@ -815,7 +779,6 @@ export default function App() {
         <Header
           activeTab={activeTab}
           setActiveTab={(tab) => {
-            if (userRole === 'siswa' && tab !== 'form') return;
             setActiveTab(tab);
             if (tab !== 'form') setEditingStudent(null);
           }}
@@ -837,7 +800,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'students' && userRole !== 'siswa' && (
+          {activeTab === 'students' && (
             <StudentList
               students={students}
               onEditStudent={handleSelectEdit}
@@ -871,12 +834,12 @@ export default function App() {
               editingStudent={editingStudent}
               onSaveStudent={handleSaveStudent}
               onCancel={() => {
-                if (userRole === 'siswa') {
-                  alert('Anda masuk sebagai Siswa. Untuk keluar, gunakan tombol Ganti Akun di sidebar.');
-                  return;
-                }
                 setEditingStudent(null);
-                setActiveTab('students');
+                if (userRole === 'siswa') {
+                  setActiveTab('schoolData');
+                } else {
+                  setActiveTab('students');
+                }
               }}
               onOpenBanPtDirectory={() => setActiveTab('banpt')}
               prefilledBanPtSelection={pendingBanPtSelection}

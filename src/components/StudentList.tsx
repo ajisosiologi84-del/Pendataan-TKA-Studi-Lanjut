@@ -99,20 +99,12 @@ export const StudentList: React.FC<StudentListProps> = ({
 
     setTimeout(() => {
       setProcessProgress(80);
-      setProcessStepText(
-        type === 'clear'
-          ? 'Membersihkan indeks data & memperbarui Google Sheets secara realtime...'
-          : 'Menyinkronkan data sampel ke penyimpanan...'
-      );
+      setProcessStepText('Membersihkan indeks data & memperbarui Google Sheets secara realtime...');
     }, 750);
 
     setTimeout(() => {
       setProcessProgress(100);
-      setProcessStepText(
-        type === 'clear'
-          ? 'Selesai! Seluruh data siswa berhasil dihapus (0 siswa).'
-          : 'Selesai! 13 Data sampel berhasil dimuat kembali.'
-      );
+      setProcessStepText('Selesai! Seluruh data siswa berhasil dihapus (0 siswa).');
     }, 1150);
 
     setTimeout(() => {
@@ -289,14 +281,6 @@ export const StudentList: React.FC<StudentListProps> = ({
                     <span>Hapus Data seluruh siswa</span>
                   </button>
                 )}
-                <button
-                  onClick={() => setShowConfirmModal('reset')}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl border border-amber-200 transition-colors"
-                  title="Reset ke 13 data sampel bawaan"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Reset 13 Sampel</span>
-                </button>
                 <button
                   onClick={onAddNewStudent}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors"
@@ -811,12 +795,6 @@ export const StudentList: React.FC<StudentListProps> = ({
                 <Trash2 className="w-3.5 h-3.5" /> Hapus Data seluruh siswa
               </button>
             )}
-            <button
-              onClick={() => setShowConfirmModal('reset')}
-              className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 underline font-medium"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Reset ke 13 Data Sampel
-            </button>
           </div>
         )}
       </div>
@@ -871,28 +849,20 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
       )}
 
-      {/* Confirmation Modal for Clear or Reset */}
+      {/* Confirmation Modal for Clear */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
             <div className="flex items-center gap-3">
-              <div
-                className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                  showConfirmModal === 'clear' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
-                }`}
-              >
-                {showConfirmModal === 'clear' ? <Trash2 className="w-5 h-5" /> : <RotateCcw className="w-5 h-5" />}
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-rose-100 text-rose-600">
+                <Trash2 className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">
-                  {showConfirmModal === 'clear'
-                    ? 'Hapus Seluruh Data Siswa TKA & Studi Lanjut?'
-                    : 'Reset ke 13 Data Sampel Bawaan?'}
+                  Hapus Seluruh Data Siswa TKA &amp; Studi Lanjut?
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                  {showConfirmModal === 'clear'
-                    ? `Tindakan ini akan MENGHAPUS SELURUH (${students.length}) data siswa TKA dari aplikasi, database Firestore, dan Google Sheets secara realtime.`
-                    : 'Tindakan ini akan mengembalikan data ke 13 data contoh sampel bawaan.'}
+                  Tindakan ini akan MENGHAPUS SELURUH ({students.length}) data siswa TKA dari aplikasi, database Firestore, dan Google Sheets secara realtime.
                 </p>
               </div>
             </div>
@@ -905,12 +875,10 @@ export const StudentList: React.FC<StudentListProps> = ({
                 Batal
               </button>
               <button
-                onClick={() => startAnimatedProcess(showConfirmModal)}
-                className={`px-4 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all ${
-                  showConfirmModal === 'clear' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'
-                }`}
+                onClick={() => startAnimatedProcess('clear')}
+                className="px-4 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all bg-rose-600 hover:bg-rose-700"
               >
-                {showConfirmModal === 'clear' ? 'Ya, Hapus Seluruh Data' : 'Ya, Reset Data Sampel'}
+                Ya, Hapus Seluruh Data
               </button>
             </div>
           </div>

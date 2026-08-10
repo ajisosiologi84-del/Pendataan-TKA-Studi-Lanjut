@@ -58,7 +58,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     namaSiswa: '',
     nis: '',
     nisn: '',
-    kelas: 'XII Merdeka 1',
+    kelas: 'XII MIPA 1',
   });
   const [formError, setFormError] = useState('');
 
@@ -70,10 +70,10 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
   // Extract unique classes
   const availableClasses = Array.from(
     new Set([
-      'XII Merdeka 1',
-      'XII Merdeka 2',
-      'XII Merdeka 3',
-      'XII Merdeka 4',
+      'XII MIPA 1',
+      'XII MIPA 2',
+      'XII IPS 1',
+      'XII IPS 2',
       ...masterStudents.map((s) => s.kelas).filter(Boolean),
     ])
   ).sort();
@@ -194,7 +194,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
       namaSiswa: '',
       nis: '',
       nisn: '',
-      kelas: availableClasses[0] || 'XII Merdeka 1',
+      kelas: availableClasses[0] || 'XII MIPA 1',
     });
     setFormError('');
     setIsAddEditModalOpen(true);
@@ -252,10 +252,10 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
   const handleDownloadTemplate = () => {
     const templateData = [
-      { 'Nama Siswa': 'Ahmad Fauzi', 'NIS': '22231001', 'NISN': '0061234561', 'Kelas': 'XII Merdeka 1' },
-      { 'Nama Siswa': 'Anisa Rahmawati', 'NIS': '22231002', 'NISN': '0061234562', 'Kelas': 'XII Merdeka 1' },
-      { 'Nama Siswa': 'Bintang Putra Pratama', 'NIS': '22231003', 'NISN': '0061234563', 'Kelas': 'XII Merdeka 2' },
-      { 'Nama Siswa': 'Citra Dewi Kartika', 'NIS': '22231004', 'NISN': '0061234564', 'Kelas': 'XII Merdeka 2' },
+      { 'Nama Siswa': 'Ahmad Fauzi', 'NIS': '22231001', 'NISN': '0061234561', 'Kelas': 'XII MIPA 1' },
+      { 'Nama Siswa': 'Anisa Rahmawati', 'NIS': '22231002', 'NISN': '0061234562', 'Kelas': 'XII MIPA 1' },
+      { 'Nama Siswa': 'Bintang Putra Pratama', 'NIS': '22231003', 'NISN': '0061234563', 'Kelas': 'XII MIPA 2' },
+      { 'Nama Siswa': 'Citra Dewi Kartika', 'NIS': '22231004', 'NISN': '0061234564', 'Kelas': 'XII MIPA 2' },
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -274,10 +274,10 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
   const handleLoadSampleTemplateText = () => {
     const sampleText = `Nama Siswa\tNIS\tNISN\tKelas
-Ahmad Fauzi\t22231001\t0061234561\tXII Merdeka 1
-Anisa Rahmawati\t22231002\t0061234562\tXII Merdeka 1
-Bintang Putra Pratama\t22231003\t0061234563\tXII Merdeka 2
-Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
+Ahmad Fauzi\t22231001\t0061234561\tXII MIPA 1
+Anisa Rahmawati\t22231002\t0061234562\tXII MIPA 1
+Bintang Putra Pratama\t22231003\t0061234563\tXII MIPA 2
+Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
     setRawImportText(sampleText);
     setImportStatus('✓ Contoh data template Excel berhasil dimuat! Klik "Pratinjau Data" untuk memeriksa.');
   };
@@ -309,14 +309,14 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
           const rawNama = String(row[namaKey] || '').trim();
           const rawNis = String(row[nisKey || ''] || '').trim();
           const rawNisn = String(row[nisnKey || ''] || '').trim();
-          const rawKelas = String(row[kelasKey || ''] || 'XII Merdeka 1').trim();
+          const rawKelas = String(row[kelasKey || ''] || 'XII MIPA 1').trim();
 
           if (rawNama) {
             parsed.push({
               namaSiswa: rawNama,
               nis: rawNis,
               nisn: rawNisn,
-              kelas: rawKelas || 'XII Merdeka 1',
+              kelas: rawKelas || 'XII MIPA 1',
             });
           }
         });
@@ -356,7 +356,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
         const rawNama = parts[0]?.trim() || '';
         const rawNis = parts[1]?.trim() || '';
         const rawNisn = parts[2]?.trim() || '';
-        const rawKelas = parts[3]?.trim() || 'XII Merdeka 1';
+        const rawKelas = parts[3]?.trim() || 'XII MIPA 1';
 
         // Skip header line if present
         if (
@@ -393,7 +393,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
       namaSiswa: item.namaSiswa,
       nis: item.nis,
       nisn: item.nisn,
-      kelas: item.kelas || 'XII Merdeka 1',
+      kelas: item.kelas || 'XII MIPA 1',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
@@ -898,7 +898,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
                 rows={4}
                 value={rawImportText}
                 onChange={(e) => setRawImportText(e.target.value)}
-                placeholder="Ahmad Fauzi&#10914;22231001&#10914;0061234561&#10914;XII Merdeka 1&#10;Anisa Rahmawati&#10914;22231002&#10914;0061234562&#10914;XII Merdeka 1"
+                placeholder="Ahmad Fauzi&#10914;22231001&#10914;0061234561&#10914;XII MIPA 1&#10;Anisa Rahmawati&#10914;22231002&#10914;0061234562&#10914;XII MIPA 1"
                 className="w-full p-3 font-mono text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               ></textarea>
             </div>

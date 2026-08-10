@@ -328,20 +328,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     setTimeout(() => {
       setSettingsProcessProgress(80);
-      setSettingsProcessStepText(
-        type === 'clear'
-          ? 'Membersihkan indeks data & riwayat simulasi...'
-          : 'Menyinkronkan data sampel ke penyimpanan...'
-      );
+      setSettingsProcessStepText('Membersihkan indeks data & riwayat simulasi...');
     }, 750);
 
     setTimeout(() => {
       setSettingsProcessProgress(100);
-      setSettingsProcessStepText(
-        type === 'clear'
-          ? 'Selesai! Seluruh data dummy siswa berhasil dikosongkan.'
-          : 'Selesai! 13 Data sampel dummy berhasil dimuat kembali.'
-      );
+      setSettingsProcessStepText('Selesai! Seluruh data dummy siswa berhasil dikosongkan.');
     }, 1150);
 
     setTimeout(() => {
@@ -1579,16 +1571,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Kosongkan Seluruh Data Dummy Siswa
-                </button>
-                <button
-                  onClick={() => {
-                    if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mereset seluruh data siswa ke 13 data bawaan sampel awal?')) {
-                      handleRunAnimatedProcess('reset');
-                    }
-                  }}
-                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> Reset ke 13 Data Sampel
                 </button>
               </div>
             </div>

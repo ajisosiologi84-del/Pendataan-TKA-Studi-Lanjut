@@ -14,7 +14,9 @@ import {
   GraduationCap,
   BookOpen,
   FileCode,
-  FileType
+  FileType,
+  ArrowLeft,
+  LogOut
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
@@ -52,11 +54,13 @@ interface StudentFormPdfModalProps {
     }>;
   };
   onClose: () => void;
+  onExitForm?: () => void;
 }
 
 export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
   formData,
   onClose,
+  onExitForm,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const pdfRef = useRef<HTMLDivElement>(null);
@@ -495,9 +499,9 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
   // Direct HTML File Download Fallback
   const handleDownloadHtmlFile = () => {
     try {
-      const qrSvgHtml = pdfRef.current?.querySelector('svg')?.outerHTML;
+      const qrSvgHtml = pdfRef.current?.querySelector('svg')?.outerHTML || '';
       const fullHtml = generateCleanPrintHtml(qrSvgHtml);
-      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const blob = new Blob(['\ufeff', fullHtml], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -505,7 +509,7 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error('Download HTML file error:', err);
     }
@@ -514,16 +518,20 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
   // Direct Word (.doc) File Download
   const handleDownloadWordDoc = () => {
     try {
-      const qrSvgHtml = pdfRef.current?.querySelector('svg')?.outerHTML;
+      const qrSvgHtml = pdfRef.current?.querySelector('svg')?.outerHTML || '';
       const fullHtml = generateCleanPrintHtml(qrSvgHtml);
       
+      // Extract <style> block from fullHtml so styles are not lost when converting to Word
+      const styleMatch = fullHtml.match(/<style[\s\S]*?>([\s\S]*?)<\/style>/i);
+      const cssStyles = styleMatch ? styleMatch[1] : '';
+
       const wordHeader = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office'
               xmlns:w='urn:schemas-microsoft-com:office:word'
               xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
           <meta charset='utf-8'>
-          <title>Bukti Pendataan Siswa</title>
+          <title>Bukti Pendataan Siswa - ${(formData.namaSiswa || 'Siswa')}</title>
           <!--[if gte mso 9]>
           <xml>
             <w:WordDocument>
@@ -533,9 +541,19 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
             </w:WordDocument>
           </xml>
           <![endif]-->
+          <style>
+            ${cssStyles}
+            body { font-family: 'Calibri', 'Arial', sans-serif; padding: 20pt; background: #ffffff; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 10pt; }
+            th, td { border: 1pt solid #cbd5e1; padding: 5pt 8pt; vertical-align: top; }
+            .section-title { background-color: #1e293b; color: #ffffff; padding: 6pt 10pt; font-weight: bold; margin-top: 12pt; margin-bottom: 8pt; }
+            .kop-header { text-align: center; border-bottom: 3pt double #0f172a; padding-bottom: 10pt; margin-bottom: 12pt; }
+            .badge-bukti { background-color: #0f172a; color: #ffffff; font-weight: bold; padding: 4pt 10pt; display: inline-block; }
+          </style>
         </head>
       `;
-      const bodyContent = fullHtml.substring(fullHtml.indexOf('<body>'));
+      const bodyStart = fullHtml.indexOf('<body>');
+      const bodyContent = bodyStart !== -1 ? fullHtml.substring(bodyStart) : `<body>${fullHtml}</body>`;
       const wordContent = wordHeader + bodyContent;
       const blob = new Blob(['\ufeff', wordContent], { type: 'application/msword;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -545,7 +563,7 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error('Download Word doc error:', err);
     }
@@ -715,10 +733,26 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
               <span>Unduh HTML</span>
             </button>
 
+            {onExitForm ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onExitForm();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md ml-1"
+                title="Selesai dan keluar dari Formulir Data Siswa"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Keluar / Selesai</span>
+              </button>
+            ) : null}
+
             <button
               type="button"
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors ml-1"
+              title="Tutup Pratinjau"
             >
               <XCircle className="w-5 h-5" />
             </button>
@@ -1093,6 +1127,76 @@ export const StudentFormPdfModal: React.FC<StudentFormPdfModalProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Modal Bottom Sticky Footer Bar */}
+        <div className="bg-slate-900 text-white p-3.5 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 shrink-0 border-t border-slate-800">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="hidden sm:inline">Pilih format unduhan atau cetak dokumen bukti pendataan siswa:</span>
+            <span className="sm:hidden">Format unduhan &amp; cetak:</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isExporting}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white text-xs font-extrabold rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isExporting ? 'Mengekspor PDF...' : 'Unduh PDF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadWordDoc}
+              className="px-3 py-2 bg-blue-700 hover:bg-blue-600 active:scale-98 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+            >
+              <FileType className="w-3.5 h-3.5 text-blue-200" />
+              <span>Unduh Word (.doc)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadHtmlFile}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 text-xs font-bold rounded-xl transition-all shadow-xs border border-slate-700 flex items-center gap-1.5"
+            >
+              <FileCode className="w-3.5 h-3.5 text-amber-300" />
+              <span>Unduh HTML</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenPrintWindow}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-98 text-indigo-200 text-xs font-bold rounded-xl transition-all shadow-xs border border-slate-700 flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5 text-indigo-300" />
+              <span>Cetak / Tab Baru</span>
+            </button>
+
+            {onExitForm ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onExitForm();
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 active:scale-98 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1.5 border border-rose-500/50 ml-auto sm:ml-0"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Selesai & Keluar Form</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-xl transition-colors ml-auto sm:ml-0"
+              >
+                Tutup Pratinjau
+              </button>
+            )}
           </div>
         </div>
       </div>

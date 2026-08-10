@@ -4,7 +4,7 @@ export const INITIAL_LAPTOPS: LaptopData[] = [
   {
     id: 'lap-101',
     namaSiswa: 'Ahmad Rizky Pratama',
-    kelas: 'XII Merdeka 1',
+    kelas: 'XII MIPA 1',
     gelombang: 'Gelombang 1 (26 - 29 Okt 2026)',
     merkLaptop: 'Asus Vivobook 14 (Core i5 / 8GB RAM)',
     kelengkapan: {
@@ -23,7 +23,7 @@ export const INITIAL_LAPTOPS: LaptopData[] = [
   {
     id: 'lap-102',
     namaSiswa: 'Siti Nurhaliza',
-    kelas: 'XII Merdeka 1',
+    kelas: 'XII MIPA 1',
     gelombang: 'Gelombang 1 (26 - 29 Okt 2026)',
     merkLaptop: 'Lenovo IdeaPad Slim 3 (Ryzen 5 / 8GB RAM)',
     kelengkapan: {
@@ -42,7 +42,7 @@ export const INITIAL_LAPTOPS: LaptopData[] = [
   {
     id: 'lap-103',
     namaSiswa: 'Budi Setiawan',
-    kelas: 'XII Merdeka 2',
+    kelas: 'XII MIPA 2',
     gelombang: 'Gelombang 2 (2 - 5 Nov 2026)',
     merkLaptop: 'Acer Aspire 5 (Core i3 / 8GB RAM)',
     kelengkapan: {
@@ -61,7 +61,7 @@ export const INITIAL_LAPTOPS: LaptopData[] = [
   {
     id: 'lap-104',
     namaSiswa: 'Dewi Anggraini',
-    kelas: 'XII Merdeka 2',
+    kelas: 'XII MIPA 2',
     gelombang: 'Gelombang 2 (2 - 5 Nov 2026)',
     merkLaptop: 'HP Pavilion 14 (AMD A9 / 4GB RAM)',
     kelengkapan: {
@@ -80,7 +80,7 @@ export const INITIAL_LAPTOPS: LaptopData[] = [
   {
     id: 'lap-105',
     namaSiswa: 'Muhammad Fajar',
-    kelas: 'XII Merdeka 3',
+    kelas: 'XII IPS 1',
     gelombang: 'Gelombang Khusus (31 Okt - 1 Nov 2026)',
     merkLaptop: 'Dell Inspiron 15 (Core i5 / 16GB RAM)',
     kelengkapan: {

@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Users className="w-5 h-5" />,
       badge: totalStudents,
       description: 'Tabel & pencarian siswa',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
     },
     {
       id: 'schoolData',
