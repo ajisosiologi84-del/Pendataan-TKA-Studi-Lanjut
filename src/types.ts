@@ -49,6 +49,7 @@ export interface MasterSchoolStudent {
   nis: string;
   nisn: string;
   kelas: string;
+  password?: string;
   createdAt?: string;
   updatedAt?: string;
 }

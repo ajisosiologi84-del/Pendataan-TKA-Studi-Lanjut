@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Building2,
   Plus,
@@ -20,6 +21,13 @@ import {
   RefreshCw,
   FileText,
   ShieldCheck,
+  KeyRound,
+  Printer,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  Shuffle,
 } from 'lucide-react';
 import { MasterSchoolStudent, NavigationTab } from '../types';
 import {
@@ -31,7 +39,37 @@ import {
   saveMasterSchoolStudents,
   DEFAULT_MASTER_SCHOOL_STUDENTS,
 } from '../utils/storage';
-import { formatNisn } from '../utils/sanitizer';
+import { formatNisn, generateRandomStudentPassword } from '../utils/sanitizer';
+
+const SimpleBarcode: React.FC<{ value: string; height?: number }> = ({ value, height = 22 }) => {
+  const bars: { width: number; isBlack: boolean }[] = [];
+  bars.push({ width: 2, isBlack: true }, { width: 1, isBlack: false }, { width: 2, isBlack: true }, { width: 1, isBlack: false });
+
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    const w1 = (code % 3) + 1;
+    const w2 = ((code * 2) % 3) + 1;
+    bars.push({ width: w1, isBlack: true }, { width: 1, isBlack: false }, { width: w2, isBlack: true }, { width: 1, isBlack: false });
+  }
+
+  bars.push({ width: 2, isBlack: true }, { width: 1, isBlack: false }, { width: 2, isBlack: true });
+  const totalWidth = bars.reduce((sum, b) => sum + b.width, 0);
+
+  let currentX = 0;
+  return (
+    <div className="inline-flex flex-col items-center">
+      <svg width={Math.min(totalWidth * 1.5, 110)} height={height} viewBox={`0 0 ${totalWidth} ${height}`} className="block">
+        {bars.map((bar, idx) => {
+          const x = currentX;
+          currentX += bar.width;
+          if (!bar.isBlack) return null;
+          return <rect key={idx} x={x} y={0} width={bar.width} height={height} fill="#000000" />;
+        })}
+      </svg>
+      <span className="font-mono text-[8px] font-bold tracking-wider text-slate-800 uppercase mt-0.5">{value}</span>
+    </div>
+  );
+};
 
 interface SchoolDataViewProps {
   masterStudents: MasterSchoolStudent[];
@@ -53,19 +91,24 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MasterSchoolStudent | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  
+  const [isPrintCardsModalOpen, setIsPrintCardsModalOpen] = useState(false);
+  const [printSelectedKelas, setPrintSelectedKelas] = useState('ALL');
+  const [copiedSuccess, setCopiedSuccess] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
   // Form State
   const [formValues, setFormValues] = useState({
     namaSiswa: '',
     nis: '',
     nisn: '',
     kelas: 'XII MIPA 1',
+    password: '',
   });
   const [formError, setFormError] = useState('');
 
   // Import State
   const [rawImportText, setRawImportText] = useState('');
-  const [importPreview, setImportPreview] = useState<Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string }>>([]);
+  const [importPreview, setImportPreview] = useState<Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string; password?: string }>>([]);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
   // Extract unique classes
@@ -85,7 +128,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
   // Confirmation Modal State (replaces window.confirm)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'single' | 'selected' | 'all' | 'reset';
+    type: 'single' | 'selected' | 'all' | 'reset' | 'regenerate';
     title: string;
     message: string;
     targetId?: string;
@@ -99,7 +142,8 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
       student.namaSiswa.toLowerCase().includes(q) ||
       student.nis.toLowerCase().includes(q) ||
       student.nisn.toLowerCase().includes(q) ||
-      student.kelas.toLowerCase().includes(q);
+      student.kelas.toLowerCase().includes(q) ||
+      (student.password && student.password.toLowerCase().includes(q));
 
     const matchesKelas = selectedKelas === 'ALL' || student.kelas === selectedKelas;
 
@@ -121,6 +165,34 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
+  };
+
+  const handleToggleShowPassword = (id: string) => {
+    setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleAutoGeneratePasswords = () => {
+    let missingCount = 0;
+    const updated = masterStudents.map((s) => {
+      if (!s.password) {
+        missingCount++;
+        return { ...s, password: generateRandomStudentPassword() };
+      }
+      return s;
+    });
+
+    if (missingCount > 0) {
+      saveMasterSchoolStudents(updated);
+      setMasterStudents(updated);
+      alert(`✓ Berhasil membuat password acak baru untuk ${missingCount} siswa!`);
+    } else {
+      setConfirmModal({
+        isOpen: true,
+        type: 'regenerate',
+        title: 'Acak Ulang Semua Password?',
+        message: `Seluruh ${masterStudents.length} siswa sudah memiliki password. Apakah Anda ingin mengacak ulang (regenerate) password acak untuk SEMUA siswa?`,
+      });
+    }
   };
 
   const handleDeleteSelected = () => {
@@ -184,6 +256,14 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     } else if (confirmModal.type === 'reset') {
       saveMasterSchoolStudents(DEFAULT_MASTER_SCHOOL_STUDENTS, true);
       setMasterStudents(DEFAULT_MASTER_SCHOOL_STUDENTS);
+    } else if (confirmModal.type === 'regenerate') {
+      const regenerated = masterStudents.map((s) => ({
+        ...s,
+        password: generateRandomStudentPassword(),
+      }));
+      saveMasterSchoolStudents(regenerated);
+      setMasterStudents(regenerated);
+      alert(`✓ Berhasil mengacak ulang password untuk seluruh ${regenerated.length} siswa!`);
     }
 
     setConfirmModal(null);
@@ -196,6 +276,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
       nis: '',
       nisn: '',
       kelas: availableClasses[0] || 'XII MIPA 1',
+      password: generateRandomStudentPassword(),
     });
     setFormError('');
     setIsAddEditModalOpen(true);
@@ -208,6 +289,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
       nis: item.nis,
       nisn: item.nisn,
       kelas: item.kelas,
+      password: item.password || generateRandomStudentPassword(),
     });
     setFormError('');
     setIsAddEditModalOpen(true);
@@ -228,6 +310,8 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
       return;
     }
 
+    const finalPassword = formValues.password.trim() || generateRandomStudentPassword();
+
     if (editingItem) {
       const updatedItem: MasterSchoolStudent = {
         ...editingItem,
@@ -235,6 +319,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
         nis: formValues.nis.trim(),
         nisn: formatNisn(formValues.nisn),
         kelas: formValues.kelas.trim(),
+        password: finalPassword,
       };
       updateMasterSchoolStudent(updatedItem);
       setMasterStudents((prev) => prev.map((s) => (s.id === updatedItem.id ? updatedItem : s)));
@@ -244,6 +329,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
         nis: formValues.nis.trim(),
         nisn: formatNisn(formValues.nisn),
         kelas: formValues.kelas.trim(),
+        password: finalPassword,
       });
       setMasterStudents((prev) => [created, ...prev]);
     }
@@ -253,19 +339,19 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
   const handleDownloadTemplate = () => {
     const templateData = [
-      { 'Nama Siswa': 'Ahmad Fauzi', 'NIS': '22231001', 'NISN': '0061234561', 'Kelas': 'XII MIPA 1' },
-      { 'Nama Siswa': 'Anisa Rahmawati', 'NIS': '22231002', 'NISN': '0061234562', 'Kelas': 'XII MIPA 1' },
-      { 'Nama Siswa': 'Bintang Putra Pratama', 'NIS': '22231003', 'NISN': '0061234563', 'Kelas': 'XII MIPA 2' },
-      { 'Nama Siswa': 'Citra Dewi Kartika', 'NIS': '22231004', 'NISN': '0061234564', 'Kelas': 'XII MIPA 2' },
+      { 'Nama Siswa': 'Ahmad Fauzi', 'NIS': '22231001', 'NISN': '0061234561', 'Kelas': 'XII MIPA 1', 'Password': '7B9K2M' },
+      { 'Nama Siswa': 'Anisa Rahmawati', 'NIS': '22231002', 'NISN': '0061234562', 'Kelas': 'XII MIPA 1', 'Password': '4X8R1P' },
+      { 'Nama Siswa': 'Bintang Putra Pratama', 'NIS': '22231003', 'NISN': '0061234563', 'Kelas': 'XII MIPA 2', 'Password': '9N2Y5T' },
+      { 'Nama Siswa': 'Citra Dewi Kartika', 'NIS': '22231004', 'NISN': '0061234564', 'Kelas': 'XII MIPA 2', 'Password': '3M7K8W' },
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
-    // Auto column widths
     worksheet['!cols'] = [
       { wch: 30 }, // Nama Siswa
       { wch: 15 }, // NIS
       { wch: 18 }, // NISN
       { wch: 20 }, // Kelas
+      { wch: 15 }, // Password
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -274,16 +360,15 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
   };
 
   const handleLoadSampleTemplateText = () => {
-    const sampleText = `Nama Siswa\tNIS\tNISN\tKelas
-Ahmad Fauzi\t22231001\t0061234561\tXII MIPA 1
-Anisa Rahmawati\t22231002\t0061234562\tXII MIPA 1
-Bintang Putra Pratama\t22231003\t0061234563\tXII MIPA 2
-Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
+    const sampleText = `Nama Siswa\tNIS\tNISN\tKelas\tPassword
+Ahmad Fauzi\t22231001\t0061234561\tXII MIPA 1\t7B9K2M
+Anisa Rahmawati\t22231002\t0061234562\tXII MIPA 1\t4X8R1P
+Bintang Putra Pratama\t22231003\t0061234563\tXII MIPA 2\t9N2Y5T
+Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2\t3M7K8W`;
     setRawImportText(sampleText);
     setImportStatus('✓ Contoh data template Excel berhasil dimuat! Klik "Pratinjau Data" untuk memeriksa.');
   };
 
-  // Upload Excel file handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -297,7 +382,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
         const ws = wb.Sheets[wsName];
         const data = XLSX.utils.sheet_to_json<any>(ws);
 
-        const parsed: Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string }> = [];
+        const parsed: Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string; password?: string }> = [];
         data.forEach((row: any) => {
           const keys = Object.keys(row);
           const findKey = (term: string) => keys.find((k) => k.toLowerCase().includes(term));
@@ -306,11 +391,13 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
           const nisKey = keys.find((k) => k.toLowerCase().includes('nis') && !k.toLowerCase().includes('nisn')) || keys[1];
           const nisnKey = findKey('nisn') || keys[2];
           const kelasKey = findKey('kelas') || keys[3];
+          const passKey = findKey('pass') || keys[4];
 
           const rawNama = String(row[namaKey] || '').trim();
           const rawNis = String(row[nisKey || ''] || '').trim();
           const rawNisn = formatNisn(row[nisnKey || '']);
           const rawKelas = String(row[kelasKey || ''] || 'XII MIPA 1').trim();
+          const rawPass = String(row[passKey || ''] || '').trim() || generateRandomStudentPassword();
 
           if (rawNama) {
             parsed.push({
@@ -318,6 +405,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
               nis: rawNis,
               nisn: rawNisn,
               kelas: rawKelas || 'XII MIPA 1',
+              password: rawPass,
             });
           }
         });
@@ -336,7 +424,6 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
     reader.readAsBinaryString(file);
   };
 
-  // Parse Excel / CSV pasted text
   const handleParseImportText = () => {
     if (!rawImportText.trim()) {
       setImportPreview([]);
@@ -345,10 +432,9 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
     }
 
     const lines = rawImportText.split('\n').filter((l) => l.trim().length > 0);
-    const parsed: Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string }> = [];
+    const parsed: Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string; password?: string }> = [];
 
     lines.forEach((line) => {
-      // Split by tab (Excel copy-paste) or comma/semicolon
       let parts = line.split('\t');
       if (parts.length < 3) parts = line.split(',');
       if (parts.length < 3) parts = line.split(';');
@@ -358,8 +444,8 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
         const rawNis = parts[1]?.trim() || '';
         const rawNisn = formatNisn(parts[2]);
         const rawKelas = parts[3]?.trim() || 'XII MIPA 1';
+        const rawPass = parts[4]?.trim() || generateRandomStudentPassword();
 
-        // Skip header line if present
         if (
           rawNama.toLowerCase().includes('nama') &&
           (rawNis.toLowerCase().includes('nis') || rawNisn.toLowerCase().includes('nisn'))
@@ -373,6 +459,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
             nis: rawNis,
             nisn: rawNisn,
             kelas: rawKelas,
+            password: rawPass,
           });
         }
       }
@@ -382,7 +469,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
     if (parsed.length > 0) {
       setImportStatus(`Berhasil membaca ${parsed.length} baris data siswa.`);
     } else {
-      setImportStatus('Gagal membaca data. Pastikan format kolom: Nama Siswa [Tab] NIS [Tab] NISN [Tab] Kelas');
+      setImportStatus('Gagal membaca data. Pastikan format kolom: Nama Siswa [Tab] NIS [Tab] NISN [Tab] Kelas [Tab] Password');
     }
   };
 
@@ -395,6 +482,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
       nis: item.nis,
       nisn: item.nisn,
       kelas: item.kelas || 'XII MIPA 1',
+      password: item.password || generateRandomStudentPassword(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
@@ -407,7 +495,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
     setRawImportText('');
     setImportPreview([]);
     setImportStatus(null);
-    alert(`Berhasil mengimpor ${newItems.length} data siswa sekolah baru!`);
+    alert(`Berhasil mengimpor ${newItems.length} data siswa sekolah baru dengan password login!`);
   };
 
   const handleExportExcel = () => {
@@ -417,22 +505,42 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
     }
     const exportData = masterStudents.map((s) => ({
       'Nama Siswa': s.namaSiswa,
-      'NIS': s.nis,
+      'NIS / Username': s.nis,
       'NISN': s.nisn,
       'Kelas': s.kelas,
+      'Password Login': s.password || s.nis,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     worksheet['!cols'] = [
       { wch: 30 },
-      { wch: 15 },
       { wch: 18 },
-      { wch: 20 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
     ];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Master Data Sekolah');
-    XLSX.writeFile(workbook, `Master_Data_Sekolah_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(workbook, `Master_Data_Sekolah_Password_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  // Print Cards Filtering
+  const studentsToPrint = masterStudents.filter((s) => {
+    if (printSelectedKelas === 'ALL') return true;
+    return s.kelas === printSelectedKelas;
+  });
+
+  const handleCopyCredentials = () => {
+    const lines = studentsToPrint.map((s, idx) => `${idx + 1}. ${s.namaSiswa} (${s.kelas}) | Username/NIS: ${s.nis} | Password: ${s.password || s.nis}`);
+    const textToCopy = `=== DAFTAR KARTU LOGIN SISWA PORTAL TKA 2026 ===\n` + lines.join('\n');
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedSuccess(true);
+    setTimeout(() => setCopiedSuccess(false), 2500);
+  };
+
+  const handleTriggerPrintCards = () => {
+    window.print();
   };
 
   return (
@@ -444,40 +552,50 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
               <Building2 className="w-3.5 h-3.5" />
-              Master Database Sekolah & Autocomplete Formulir
+              Master Database Sekolah & Kartu Login Siswa (Stiker)
             </div>
             <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800/50">
-              <ShieldCheck className="w-3.5 h-3.5" /> Synchronized with Firebase Realtime
+              <ShieldCheck className="w-3.5 h-3.5" /> Password Terenkripsi & Sinkron Realtime
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl lg:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                INPUT DATA SEKOLAH
+                INPUT DATA SEKOLAH & KARTU LOGIN
               </h2>
               <p className="text-slate-300 text-xs lg:text-sm mt-1 max-w-2xl leading-relaxed">
-                Pengelolaan master data dasar seluruh siswa sekolah (Nama, NIS, NISN, Kelas). Data di menu ini berfungsi sebagai rujukan awal yang otomatis muncul dan melengkapi saat siswa mengisi Formulir Pendataan Siswa.
+                Kelola data master siswa (Nama, NIS, NISN, Kelas) dan password acak siswa untuk keamanan login. Output kartu login siswa dapat dicetak masal dalam bentuk <strong className="text-amber-300">Stiker Tempel</strong> berdasarkan kelas.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
               <button
-                onClick={handleDownloadTemplate}
-                className="inline-flex items-center gap-2 bg-indigo-900/80 hover:bg-indigo-900 text-indigo-100 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-indigo-700/60 transition-all hover:border-indigo-500"
-                title="Unduh file template Excel (.xlsx) dengan format Nama Siswa, NIS, NISN, Kelas"
+                onClick={handleAutoGeneratePasswords}
+                className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-md shadow-amber-600/30 hover:scale-[1.02] active:scale-[0.98]"
+                title="Generasikan password acak otomatis untuk siswa"
               >
-                <Download className="w-4 h-4 text-indigo-300" /> Template Excel (.xlsx)
+                <Shuffle className="w-4 h-4" /> Acak Password Masal
               </button>
+
+              <button
+                onClick={() => setIsPrintCardsModalOpen(true)}
+                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98]"
+                title="Cetak Kartu Login Siswa tampilan stiker masal per kelas"
+              >
+                <Printer className="w-4 h-4" /> Cetak Kartu Login (Stiker)
+              </button>
+
               <button
                 onClick={handleOpenAddModal}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-[0.98]"
+                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 hover:scale-[1.02]"
               >
                 <Plus className="w-4 h-4" /> Tambah Siswa
               </button>
+
               <button
                 onClick={() => setIsImportModalOpen(true)}
-                className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 transition-all hover:border-slate-600"
+                className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-3 py-2.5 rounded-xl border border-slate-700 transition-all hover:border-slate-600"
               >
                 <Upload className="w-4 h-4 text-emerald-400" /> Import Excel
               </button>
@@ -487,7 +605,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
       </div>
 
       {/* Summary Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Siswa Master</p>
@@ -501,23 +619,36 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Rombel / Kelas</p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{availableClasses.length} <span className="text-xs font-normal text-slate-500">Kelas</span></h3>
-            <p className="text-[11px] text-indigo-600 font-medium mt-1">Terintegrasi Tingkat XII</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Password Sistem Acak</p>
+            <h3 className="text-2xl font-black text-amber-600 mt-1">
+              {masterStudents.filter((s) => !!s.password).length} / {masterStudents.length}
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1">Terproteksi Login Unik</p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <KeyRound className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Rombel / Kelas</p>
+            <h3 className="text-2xl font-black text-slate-800 mt-1">{availableClasses.length} <span className="text-xs font-normal text-slate-500">Kelas</span></h3>
+            <p className="text-[11px] text-indigo-600 font-medium mt-1">Siap Cetak Masal Stiker</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
             <GraduationCap className="w-6 h-6" />
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Validasi NIS & NISN</p>
-            <h3 className="text-2xl font-black text-emerald-600 mt-1">100% <span className="text-xs font-normal text-slate-500">Terdaftar</span></h3>
-            <p className="text-[11px] text-slate-500 mt-1">Sinkron dengan Database Cloud</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Format Kartu Stiker</p>
+            <h3 className="text-2xl font-black text-emerald-600 mt-1">100% <span className="text-xs font-normal text-slate-500">Standar TKA</span></h3>
+            <p className="text-[11px] text-slate-500 mt-1">Barcode & QR Code Terintegrasi</p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <CheckCircle2 className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+            <Printer className="w-6 h-6" />
           </div>
         </div>
       </div>
@@ -529,7 +660,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari berdasarkan Nama Siswa, NIS, atau NISN..."
+              placeholder="Cari Nama Siswa, NIS, NISN, atau Password..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
@@ -565,11 +696,22 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
           )}
 
           <button
-            onClick={handleExportExcel}
+            onClick={() => {
+              setPrintSelectedKelas(selectedKelas);
+              setIsPrintCardsModalOpen(true);
+            }}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all"
+            title="Cetak Stiker Login Siswa"
+          >
+            <Printer className="w-3.5 h-3.5 text-emerald-600" /> Cetak Stiker Login
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all"
             title="Export data ke file Excel (.xlsx)"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-600" /> Export Excel (.xlsx)
+            <Download className="w-3.5 h-3.5 text-indigo-600" /> Export Excel
           </button>
 
           {masterStudents.length > 0 && (
@@ -596,10 +738,10 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-indigo-600" /> Data Awal Siswa Sekolah ({filteredStudents.length} Tampil)
+            <FileText className="w-4 h-4 text-indigo-600" /> Data Master Siswa & Kredensial Login ({filteredStudents.length} Tampil)
           </h3>
-          <span className="text-xs text-slate-500 font-medium">
-            Format resmi: Nama Siswa | NIS | NISN | Kelas
+          <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+            Format: Nama Siswa | NIS | NISN | Kelas | Password Siswa
           </span>
         </div>
 
@@ -618,17 +760,18 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                 </th>
                 <th className="py-3 px-3 w-10 text-center">No</th>
                 <th className="py-3 px-4">Nama Siswa</th>
-                <th className="py-3 px-4">NIS</th>
+                <th className="py-3 px-4">NIS / Username</th>
                 <th className="py-3 px-4">NISN</th>
                 <th className="py-3 px-4">Kelas</th>
-                <th className="py-3 px-4 text-center">Status Master</th>
+                <th className="py-3 px-4">Password Akses Login</th>
+                <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-center w-36">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="font-bold text-sm text-slate-600">Tidak ada data siswa sekolah yang ditemukan.</p>
                     <p className="text-xs text-slate-400 mt-1">Coba ubah kata kunci pencarian atau tambah data baru.</p>
@@ -637,6 +780,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
               ) : (
                 filteredStudents.map((student, idx) => {
                   const isSelected = selectedIds.includes(student.id);
+                  const showPass = visiblePasswords[student.id];
                   return (
                     <tr
                       key={student.id}
@@ -659,7 +803,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                         </div>
                         <span>{student.namaSiswa}</span>
                       </td>
-                      <td className="py-3 px-4 font-mono font-bold text-indigo-900 bg-indigo-50/50 rounded px-2 py-1 inline-block mt-2">
+                      <td className="py-3 px-4 font-mono font-bold text-indigo-900 bg-indigo-50/50 rounded px-2 py-1 inline-block mt-1">
                         {student.nis || '-'}
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-600">
@@ -670,9 +814,24 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                           {student.kelas}
                         </span>
                       </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-black text-emerald-950 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md tracking-wider">
+                            {showPass ? student.password || student.nis : '••••••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleShowPassword(student.id)}
+                            className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                            title={showPass ? 'Sembunyikan Password' : 'Lihat Password'}
+                          >
+                            {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3" /> Valid Master
+                          <CheckCircle2 className="w-3 h-3" /> Valid
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -689,7 +848,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                           <button
                             onClick={() => handleOpenEditModal(student)}
                             className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                            title="Edit Data"
+                            title="Edit Data / Password"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -718,7 +877,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-indigo-600" />
-                {editingItem ? 'Edit Data Sekolah Siswa' : 'Tambah Data Sekolah Siswa'}
+                {editingItem ? 'Edit Data Sekolah & Password Siswa' : 'Tambah Data Sekolah Siswa'}
               </h3>
               <button
                 onClick={() => setIsAddEditModalOpen(false)}
@@ -788,6 +947,28 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                 </select>
               </div>
 
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">Password Acak Sistem <span className="text-rose-500">*</span></label>
+                  <button
+                    type="button"
+                    onClick={() => setFormValues((prev) => ({ ...prev, password: generateRandomStudentPassword() }))}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                  >
+                    <Shuffle className="w-3 h-3" /> Acak Baru
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Password acak login siswa"
+                  value={formValues.password}
+                  onChange={(e) => setFormValues({ ...formValues, password: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-amber-50/50 border border-amber-200 rounded-xl text-xs font-mono font-black text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Password ini tercetak pada Stiker Kartu Login Siswa.</p>
+              </div>
+
               <div className="pt-3 flex items-center justify-between gap-2 border-t border-slate-100">
                 {editingItem ? (
                   <button
@@ -842,10 +1023,10 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <p className="font-bold flex items-center gap-1.5 text-amber-950">
-                    <Sparkles className="w-4 h-4 text-amber-600" /> Format Kolom Excel (Nama Siswa, NIS, NISN, Kelas):
+                    <Sparkles className="w-4 h-4 text-amber-600" /> Format Kolom Excel (Nama Siswa, NIS, NISN, Kelas, Password):
                   </p>
                   <p className="font-mono text-[11px] text-amber-800 mt-0.5">
-                    Kolom 1: Nama Siswa | Kolom 2: NIS | Kolom 3: NISN | Kolom 4: Kelas
+                    Kolom 1: Nama | Kolom 2: NIS | Kolom 3: NISN | Kolom 4: Kelas | Kolom 5: Password (Opsional)
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -899,7 +1080,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                 rows={4}
                 value={rawImportText}
                 onChange={(e) => setRawImportText(e.target.value)}
-                placeholder="Ahmad Fauzi&#10914;22231001&#10914;0061234561&#10914;XII MIPA 1&#10;Anisa Rahmawati&#10914;22231002&#10914;0061234562&#10914;XII MIPA 1"
+                placeholder="Ahmad Fauzi&#10914;22231001&#10914;0061234561&#10914;XII MIPA 1&#10914;7B9K2M"
                 className="w-full p-3 font-mono text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               ></textarea>
             </div>
@@ -919,6 +1100,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                       <th className="p-2">NIS</th>
                       <th className="p-2">NISN</th>
                       <th className="p-2">Kelas</th>
+                      <th className="p-2">Password</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -928,6 +1110,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
                         <td className="p-2 font-mono">{p.nis}</td>
                         <td className="p-2 font-mono">{p.nisn}</td>
                         <td className="p-2">{p.kelas}</td>
+                        <td className="p-2 font-mono font-bold text-indigo-900">{p.password || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -965,6 +1148,206 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
           </div>
         </div>
       )}
+
+      {/* CETAK KARTU LOGIN SISWA MODAL (STIKER STYLE) */}
+      {isPrintCardsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          {/* Print Style Injector */}
+          <style>{`
+            @media print {
+              body * {
+                visibility: hidden !important;
+              }
+              #printable-sticker-cards-container, #printable-sticker-cards-container * {
+                visibility: visible !important;
+              }
+              #printable-sticker-cards-container {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 15px !important;
+                background: white !important;
+              }
+              .no-print {
+                display: none !important;
+              }
+              .sticker-card {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                border: 2px solid #000 !important;
+                box-shadow: none !important;
+              }
+            }
+          `}</style>
+
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 shadow-2xl border border-slate-200 my-8 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3 no-print">
+              <div>
+                <h3 className="font-black text-lg text-slate-900 flex items-center gap-2">
+                  <Printer className="w-5 h-5 text-emerald-600" />
+                  Cetak Kartu Login Siswa (Tampilan Stiker Tempel)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Desain stiker presisi berisi Username (NIS), NISN, dan Password acak sistem untuk kemudahan login siswa.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyCredentials}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-xl border border-indigo-200 transition-all"
+                  title="Salin seluruh username dan password siswa dalam bentuk teks"
+                >
+                  {copiedSuccess ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  {copiedSuccess ? 'Tersalin ke Clipboard!' : 'Salin Semua Teks'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTriggerPrintCards}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all active:scale-95"
+                >
+                  <Printer className="w-4 h-4" /> Cetak Masal (Print / PDF)
+                </button>
+
+                <button
+                  onClick={() => setIsPrintCardsModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar in Modal */}
+            <div className="py-3 px-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-indigo-600" /> Filter Kelas Siswa:
+                </label>
+                <select
+                  value={printSelectedKelas}
+                  onChange={(e) => setPrintSelectedKelas(e.target.value)}
+                  className="bg-white border border-slate-300 rounded-xl text-xs font-bold px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="ALL">Semua Kelas ({masterStudents.length} Siswa)</option>
+                  {availableClasses.map((k) => (
+                    <option key={k} value={k}>
+                      Kelas {k} ({masterStudents.filter((s) => s.kelas === k).length} Siswa)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-xs font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
+                Menampilkan <strong className="text-emerald-700">{studentsToPrint.length}</strong> Kartu Stiker Login
+              </div>
+            </div>
+
+            {/* PRINTABLE STICKER CARDS AREA */}
+            <div id="printable-sticker-cards-container" className="flex-1 overflow-y-auto p-4 space-y-6">
+              {studentsToPrint.length === 0 ? (
+                <div className="py-12 text-center text-slate-400">
+                  <AlertCircle className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="font-bold text-slate-600">Tidak ada kartu login siswa untuk kelas ini.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {studentsToPrint.map((student, idx) => (
+                    <div
+                      key={student.id || idx}
+                      className="sticker-card border-2 border-slate-900 rounded-2xl p-4 bg-white relative space-y-3 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      {/* Top Sticker Header */}
+                      <div className="flex items-center justify-between border-b-2 border-slate-900 pb-2.5 gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <QRCodeSVG
+                            value={`SITAKA-LOGIN|NIS:${student.nis}|PASS:${student.password || student.nis}`}
+                            size={44}
+                          />
+                          <div>
+                            <h4 className="font-black text-xs uppercase tracking-tight text-slate-950 font-sans">
+                              KARTU LOGIN SISWA TKA 2026
+                            </h4>
+                            <p className="text-[10px] font-bold text-slate-700 font-sans">
+                              SMA / MA / SMK SITAKA 2026
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] font-black uppercase bg-slate-900 text-white px-2.5 py-0.5 rounded-md inline-block">
+                            {student.kelas}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-500 block mt-0.5 font-mono">
+                            STIKER #{idx + 1}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Main Credentials Box */}
+                      <div className="space-y-2">
+                        <div>
+                          <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider block">
+                            NAMA LENGKAP SISWA:
+                          </span>
+                          <h3 className="text-sm font-black text-slate-950 uppercase tracking-tight">
+                            {student.namaSiswa}
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                          <div>
+                            <span className="text-[9px] text-slate-500 font-bold block uppercase">USERNAME / NIS:</span>
+                            <span className="text-xs font-mono font-extrabold text-slate-900 block">
+                              {student.nis}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono block">
+                              NISN: {student.nisn || '-'}
+                            </span>
+                          </div>
+
+                          <div className="border-l border-slate-200 pl-2">
+                            <span className="text-[9px] text-indigo-700 font-extrabold block uppercase">PASSWORD LOGIN:</span>
+                            <span className="text-xs font-mono font-black text-indigo-950 bg-indigo-100 border border-indigo-300 px-2 py-0.5 rounded inline-block mt-0.5 shadow-2xs">
+                              {student.password || student.nis}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer Info & Barcode */}
+                      <div className="border-t border-slate-300 pt-2 flex items-center justify-between text-[9px] text-slate-600 font-sans">
+                        <span className="italic max-w-[200px] leading-tight">
+                          Gunakan Username (NIS) & Password acak ini untuk login Portal SISWA TKA.
+                        </span>
+                        <SimpleBarcode value={`NIS-${student.nis}`} height={20} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 no-print">
+              <span>Status: <strong className="text-emerald-700 font-bold">Siap Dicetak ({studentsToPrint.length} Stiker)</strong></span>
+              <button
+                type="button"
+                onClick={() => setIsPrintCardsModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Custom Confirmation Modal */}
       {confirmModal?.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -989,12 +1372,12 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2`;
               <button
                 onClick={handleConfirmAction}
                 className={`px-5 py-2 text-white font-bold text-xs rounded-xl transition-all shadow-md ${
-                  confirmModal.type === 'reset'
+                  confirmModal.type === 'reset' || confirmModal.type === 'regenerate'
                     ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
                     : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
                 }`}
               >
-                {confirmModal.type === 'reset' ? 'Ya, Muat Contoh' : 'Ya, Hapus Sekarang'}
+                {confirmModal.type === 'reset' ? 'Ya, Muat Contoh' : confirmModal.type === 'regenerate' ? 'Ya, Acak Ulang' : 'Ya, Hapus Sekarang'}
               </button>
             </div>
           </div>

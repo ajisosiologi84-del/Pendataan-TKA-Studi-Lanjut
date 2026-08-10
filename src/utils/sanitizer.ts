@@ -32,3 +32,12 @@ export function isValidNisFormat(nis: string): boolean {
   // NIS usually 3-15 characters alphanumeric
   return /^[a-zA-Z0-9.-]{3,20}$/.test(nis.trim());
 }
+
+export function generateRandomStudentPassword(length = 6): string {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}

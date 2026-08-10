@@ -865,6 +865,7 @@ export default function App() {
               prefilledBanPtSelection={pendingBanPtSelection}
               onClearPrefilledBanPt={() => setPendingBanPtSelection(null)}
               userRole={userRole}
+              currentUserNis={currentUserNis}
               isStudentFormOpen={isStudentFormOpen}
               masterStudents={masterSchoolStudents}
             />

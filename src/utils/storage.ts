@@ -23,7 +23,7 @@ import {
 } from '../firebase';
 import { INITIAL_STUDENTS } from '../data/mockStudents';
 import { INITIAL_LAPTOPS } from '../data/mockLaptops';
-import { formatNisn } from './sanitizer';
+import { formatNisn, generateRandomStudentPassword } from './sanitizer';
 
 const STORAGE_KEY = 'tka_studi_lanjut_students_v1';
 const MASTER_SCHOOL_STUDENTS_KEY = 'tka_master_school_students_v1';
@@ -895,14 +895,14 @@ export function clearActiveSessionsExceptCurrent(): void {
 
 // --- MASTER DATA SEKOLAH (NAMA, NIS, NISN, KELAS) ---
 export const DEFAULT_MASTER_SCHOOL_STUDENTS: MasterSchoolStudent[] = [
-  { id: 'mst-101', namaSiswa: 'Ahmad Fauzi', nis: '22231001', nisn: '0061234561', kelas: 'XII MIPA 1' },
-  { id: 'mst-102', namaSiswa: 'Anisa Rahmawati', nis: '22231002', nisn: '0061234562', kelas: 'XII MIPA 1' },
-  { id: 'mst-103', namaSiswa: 'Bintang Putra Pratama', nis: '22231003', nisn: '0061234563', kelas: 'XII MIPA 2' },
-  { id: 'mst-104', namaSiswa: 'Citra Dewi Kartika', nis: '22231004', nisn: '0061234564', kelas: 'XII MIPA 2' },
-  { id: 'mst-105', namaSiswa: 'Daffa Rizky Ramadhan', nis: '22231005', nisn: '0061234565', kelas: 'XII IPS 1' },
-  { id: 'mst-106', namaSiswa: 'Eka Nur Syamsiah', nis: '22231006', nisn: '0061234566', kelas: 'XII IPS 1' },
-  { id: 'mst-107', namaSiswa: 'Farhan Aditya Nugraha', nis: '22231007', nisn: '0061234567', kelas: 'XII IPS 2' },
-  { id: 'mst-108', namaSiswa: 'Gita Savitri Maharani', nis: '22231008', nisn: '0061234568', kelas: 'XII IPS 2' },
+  { id: 'mst-101', namaSiswa: 'Ahmad Fauzi', nis: '22231001', nisn: '0061234561', kelas: 'XII MIPA 1', password: '7B9K2M' },
+  { id: 'mst-102', namaSiswa: 'Anisa Rahmawati', nis: '22231002', nisn: '0061234562', kelas: 'XII MIPA 1', password: '4X8R1P' },
+  { id: 'mst-103', namaSiswa: 'Bintang Putra Pratama', nis: '22231003', nisn: '0061234563', kelas: 'XII MIPA 2', password: '9N2Y5T' },
+  { id: 'mst-104', namaSiswa: 'Citra Dewi Kartika', nis: '22231004', nisn: '0061234564', kelas: 'XII MIPA 2', password: '3M7K8W' },
+  { id: 'mst-105', namaSiswa: 'Daffa Rizky Ramadhan', nis: '22231005', nisn: '0061234565', kelas: 'XII IPS 1', password: '5L9A2Z' },
+  { id: 'mst-106', namaSiswa: 'Eka Nur Syamsiah', nis: '22231006', nisn: '0061234566', kelas: 'XII IPS 1', password: '8P3H7Q' },
+  { id: 'mst-107', namaSiswa: 'Farhan Aditya Nugraha', nis: '22231007', nisn: '0061234567', kelas: 'XII IPS 2', password: '2J6W4D' },
+  { id: 'mst-108', namaSiswa: 'Gita Savitri Maharani', nis: '22231008', nisn: '0061234568', kelas: 'XII IPS 2', password: '6V1S8E' },
 ];
 
 export function sanitizeKelas(kelasStr?: string): string {
@@ -930,8 +930,9 @@ export function getStoredMasterSchoolStudents(): MasterSchoolStudent[] {
       const sanitized = parsed.map((item: MasterSchoolStudent) => {
         const newKelas = sanitizeKelas(item.kelas);
         const newNisn = formatNisn(item.nisn);
-        if (newKelas !== item.kelas || newNisn !== item.nisn) changed = true;
-        return { ...item, kelas: newKelas, nisn: newNisn };
+        const newPassword = item.password || generateRandomStudentPassword();
+        if (newKelas !== item.kelas || newNisn !== item.nisn || newPassword !== item.password) changed = true;
+        return { ...item, kelas: newKelas, nisn: newNisn, password: newPassword };
       });
       if (changed) {
         localStorage.setItem(MASTER_SCHOOL_STUDENTS_KEY, JSON.stringify(sanitized));
@@ -962,6 +963,7 @@ export function addMasterSchoolStudent(item: Omit<MasterSchoolStudent, 'id'>): M
   const current = getStoredMasterSchoolStudents();
   const newItem: MasterSchoolStudent = {
     ...item,
+    password: item.password || generateRandomStudentPassword(),
     id: 'mst-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
