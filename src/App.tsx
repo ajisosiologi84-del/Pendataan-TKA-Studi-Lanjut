@@ -33,6 +33,7 @@ import {
 import {
   subscribeStudentsFromFirestore,
   syncStudentToFirestore,
+  deleteStudentFromFirestore,
   fetchSystemSettingsFromFirestore,
   subscribeSystemSettingFromFirestore
 } from './firebase';
@@ -155,11 +156,25 @@ export default function App() {
     // Subscribe to Firestore students collection changes
     const unsubscribeStudents = subscribeStudentsFromFirestore((remoteStudents) => {
       if (remoteStudents && remoteStudents.length > 0) {
-        setStudents(remoteStudents);
-        saveStudents(remoteStudents);
-      } else if (localList && localList.length > 0) {
-        // First time cloud sync: sync local students to Firestore
-        localList.forEach((s) => syncStudentToFirestore(s));
+        const cleanRemote = remoteStudents.filter(
+          (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+        );
+
+        // Delete any found sample dummy students from Firestore
+        remoteStudents.forEach((s: any) => {
+          if (s && s.id && (/^std-1[0-2][0-9]$/.test(s.id) || s.id === 'std-101')) {
+            deleteStudentFromFirestore(s.id);
+          }
+        });
+
+        setStudents(cleanRemote);
+        saveStudents(cleanRemote);
+      } else {
+        const cleanLocal = getStoredStudents().filter(
+          (s) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+        );
+        setStudents(cleanLocal);
+        saveStudents(cleanLocal);
       }
     });
 

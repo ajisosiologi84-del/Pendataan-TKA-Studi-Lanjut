@@ -68,7 +68,8 @@ export const PRODI_POPULAR_OPTIONS = [
   'Desain Komunikasi Visual (DKV)',
 ];
 
-export const INITIAL_STUDENTS: Student[] = [
+export const INITIAL_STUDENTS: Student[] = [];
+const OLD_INITIAL_STUDENTS: Student[] = []; /*
   {
     id: 'std-101',
     namaSiswa: 'Ahmad Fauzi Nurrahman',
@@ -288,7 +289,7 @@ export const INITIAL_STUDENTS: Student[] = [
     catatan: 'Portofolio kewirausahaan muda',
     updatedAt: '2026-08-06',
   },
-];
+]; */;
 
 export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * Google Apps Script Backend - Administrasi Pendataan TKA & Studi Lanjut + Sarana Ujian Laptop (Lengkap)
