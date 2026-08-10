@@ -542,6 +542,46 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheets = setupAllSheets();
 
+    if (action === "ping" || action === "test") {
+      return responseJSON({
+        status: "success",
+        message: "Koneksi Google Sheets Apps Script Berhasil Terhubung!",
+        spreadsheetName: ss.getName(),
+        time: new Date().toISOString()
+      });
+    }
+
+    if (action === "getAll") {
+      return doGet(e);
+    }
+
+    if (action === "batchSave") {
+      var countS = 0, countL = 0, countP = 0;
+      if (Array.isArray(contents.students)) {
+        contents.students.forEach(function(st) {
+          handleStudentPost(sheets.sheetStudents, "save", { student: st });
+          countS++;
+        });
+      }
+      if (Array.isArray(contents.laptops)) {
+        contents.laptops.forEach(function(lp) {
+          handleLaptopPost(sheets.sheetLaptops, "saveLaptop", { laptop: lp });
+          countL++;
+        });
+      }
+      if (Array.isArray(contents.proktorList)) {
+        contents.proktorList.forEach(function(pr) {
+          handleProktorPost(sheets.sheetProktor, "saveProktor", { proktor: pr });
+          countP++;
+        });
+      }
+      return responseJSON({
+        status: "success",
+        message: "Batch save berhasil: " + countS + " siswa, " + countL + " laptop, " + countP + " proktor.",
+        counts: { students: countS, laptops: countL, proktor: countP }
+      });
+    }
+
     if (target === "laptop" || action === "saveLaptop" || action === "deleteLaptop") {
       return handleLaptopPost(sheets.sheetLaptops, action, contents);
     }
