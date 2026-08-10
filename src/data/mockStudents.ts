@@ -713,12 +713,35 @@ function handleStudentPost(sheet, action, contents) {
     const studentId = contents.id;
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0] == studentId) {
+      if (data[i][0] == studentId || (contents.nis && data[i][2] == contents.nis)) {
         sheet.deleteRow(i + 1);
         return responseJSON({ status: "success", message: "Data Siswa berhasil dihapus" });
       }
     }
     return responseJSON({ status: "error", message: "Data Siswa tidak ditemukan" });
+  }
+
+  if (action === "clearAll" || action === "deleteAll") {
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+    }
+    return responseJSON({ status: "success", message: "Seluruh Data Siswa berhasil dikosongkan dari Google Sheets" });
+  }
+
+  if (action === "deleteMultiple") {
+    const ids = contents.ids || [];
+    const data = sheet.getDataRange().getValues();
+    let count = 0;
+    for (let i = data.length - 1; i >= 1; i--) {
+      var rowId = (data[i][0] || "").toString();
+      var rowNis = (data[i][2] || "").toString();
+      if (ids.indexOf(rowId) > -1 || ids.indexOf(rowNis) > -1) {
+        sheet.deleteRow(i + 1);
+        count++;
+      }
+    }
+    return responseJSON({ status: "success", message: count + " Data Siswa berhasil dihapus dari Google Sheets" });
   }
 
   return responseJSON({ status: "error", message: "Action tidak dikenal" });

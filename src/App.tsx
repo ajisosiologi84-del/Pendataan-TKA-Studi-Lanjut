@@ -5,6 +5,7 @@ import {
   addStudent,
   updateStudent,
   deleteStudent,
+  deleteMultipleStudents,
   resetToDefaultData,
   clearAllStudentsData,
   getAppsScriptUrl,
@@ -235,7 +236,7 @@ export default function App() {
 
     // Real-time listener for Students collection
     const unsubscribeStudents = subscribeStudentsFromFirestore((remoteStudents) => {
-      if (remoteStudents && remoteStudents.length > 0) {
+      if (Array.isArray(remoteStudents)) {
         const cleanRemote = remoteStudents.filter(
           (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101' && !isExcludedStudentName(s.namaSiswa)
         );
@@ -335,20 +336,38 @@ export default function App() {
       if (found) {
         setEditingStudent(found);
       } else {
-        setEditingStudent({
-          id: '',
-          namaSiswa: '',
-          nis: nis,
-          nisn: '',
-          kelas: 'XII Merdeka 1',
-          jenisKelamin: 'L',
-          mapelTka1: 'Matematika',
-          mapelTka2: 'Fisika',
-          pilihanStudiLanjut: 'Kuliah',
-          prodiPilihan1: '',
-          prodiPilihan2: '',
-          updatedAt: new Date().toISOString()
-        });
+        const masterFound = masterSchoolStudents.find((m) => m.nis === nis || (m.nisn && m.nisn === nis));
+        if (masterFound) {
+          setEditingStudent({
+            id: '',
+            namaSiswa: masterFound.namaSiswa,
+            nis: masterFound.nis,
+            nisn: masterFound.nisn,
+            kelas: masterFound.kelas || 'XII Merdeka 1',
+            jenisKelamin: 'L',
+            mapelTka1: 'Matematika',
+            mapelTka2: 'Fisika',
+            pilihanStudiLanjut: 'Kuliah',
+            prodiPilihan1: '',
+            prodiPilihan2: '',
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          setEditingStudent({
+            id: '',
+            namaSiswa: '',
+            nis: nis,
+            nisn: '',
+            kelas: 'XII Merdeka 1',
+            jenisKelamin: 'L',
+            mapelTka1: 'Matematika',
+            mapelTka2: 'Fisika',
+            pilihanStudiLanjut: 'Kuliah',
+            prodiPilihan1: '',
+            prodiPilihan2: '',
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
       setActiveTab('form');
     } else {
@@ -645,6 +664,74 @@ export default function App() {
     }
   };
 
+  // Delete multiple selected / filtered students
+  const handleDeleteMultipleStudents = (ids: string[]) => {
+    if (userRole === 'walikelas' || userRole === 'bk') {
+      alert('Akses ditolak: Wali Kelas dan Guru BK memiliki hak akses lihat (read-only).');
+      return;
+    }
+    deleteMultipleStudents(ids);
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            target: 'student',
+            action: 'deleteMultiple',
+            ids: ids,
+          }),
+        }).catch((err) => console.log('Apps Script Student deleteMultiple note:', err));
+      } catch (err) {}
+    }
+
+    addSecurityLog({
+      role: userRole || 'superadmin',
+      action: 'DELETE_MULTIPLE_STUDENTS',
+      category: 'DATA_CHANGE',
+      status: 'SUCCESS',
+      details: `Menghapus ${ids.length} data siswa terfilter/terpilih`,
+    });
+
+    const refreshed = getStoredStudents();
+    setStudents(refreshed);
+    if (detailStudent && ids.includes(detailStudent.id)) {
+      setDetailStudent(null);
+    }
+  };
+
+  // Clear all students
+  const handleClearAllStudents = () => {
+    if (userRole === 'walikelas' || userRole === 'bk') {
+      alert('Akses ditolak: Wali Kelas dan Guru BK memiliki hak akses lihat (read-only).');
+      return;
+    }
+    const cleared = clearAllStudentsData();
+    setStudents(cleared);
+
+    if (appsScriptUrl) {
+      try {
+        fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            target: 'student',
+            action: 'clearAll',
+          }),
+        }).catch((err) => console.log('Apps Script Student clearAll note:', err));
+      } catch (err) {}
+    }
+
+    addSecurityLog({
+      role: userRole || 'superadmin',
+      action: 'CLEAR_ALL_STUDENTS',
+      category: 'SYSTEM',
+      status: 'WARNING',
+      details: 'Pengguna menghapus seluruh data siswa TKA & Studi Lanjut',
+    });
+  };
+
   // Reset to default sample students
   const handleResetData = () => {
     if (userRole !== 'superadmin') return;
@@ -698,7 +785,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex">
       {!userRole && (
-        <LoginModal onLogin={handleLogin} students={students} />
+        <LoginModal onLogin={handleLogin} students={students} masterStudents={masterSchoolStudents} />
       )}
 
       {/* Left Sidebar Menu Layout */}
@@ -707,10 +794,6 @@ export default function App() {
         setActiveTab={(tab) => {
           if (userRole === 'siswa' && tab !== 'form' && tab !== 'banpt' && tab !== 'mapelPilihan') {
             alert('Siswa hanya dapat mengakses formulir pengisian data, Direktori BAN-PT, dan Mata Pelajaran Pilihan.');
-            return;
-          }
-          if ((userRole === 'walikelas' || userRole === 'bk') && tab === 'form') {
-            alert('Wali Kelas dan Guru BK mengisi data melalui menu Data Siswa.');
             return;
           }
           setActiveTab(tab);
@@ -759,6 +842,7 @@ export default function App() {
               students={students}
               onEditStudent={handleSelectEdit}
               onDeleteStudent={handleDeleteStudent}
+              onDeleteMultipleStudents={handleDeleteMultipleStudents}
               onSelectStudentDetail={setDetailStudent}
               onAddNewStudent={() => {
                 if (userRole === 'walikelas' || userRole === 'bk') return;
@@ -766,17 +850,7 @@ export default function App() {
                 setActiveTab('form');
               }}
               onResetData={handleResetData}
-              onClearData={() => {
-                const cleared = clearAllStudentsData();
-                setStudents(cleared);
-                addSecurityLog({
-                  role: userRole,
-                  action: 'CLEAR_ALL_STUDENTS',
-                  category: 'SYSTEM',
-                  status: 'WARNING',
-                  details: 'Pengguna mengosongkan seluruh database siswa (menghapus data dummy)',
-                });
-              }}
+              onClearData={handleClearAllStudents}
               onRefreshData={handleRefreshData}
               isReadOnly={userRole === 'walikelas' || userRole === 'bk'}
               userRole={userRole}

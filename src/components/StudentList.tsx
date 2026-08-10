@@ -33,6 +33,7 @@ interface StudentListProps {
   students: Student[];
   onEditStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
+  onDeleteMultipleStudents?: (ids: string[]) => void;
   onSelectStudentDetail: (student: Student) => void;
   onAddNewStudent: () => void;
   onResetData: () => void;
@@ -46,6 +47,7 @@ export const StudentList: React.FC<StudentListProps> = ({
   students,
   onEditStudent,
   onDeleteStudent,
+  onDeleteMultipleStudents,
   onSelectStudentDetail,
   onAddNewStudent,
   onResetData,
@@ -62,11 +64,13 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showFilterDeleteModal, setShowFilterDeleteModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Animated process state for clearing/resetting dummy data
+  // Animated process state for clearing/resetting data
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [processType, setProcessType] = useState<'clear' | 'reset' | null>(null);
   const [processProgress, setProcessProgress] = useState(0);
@@ -80,15 +84,15 @@ export const StudentList: React.FC<StudentListProps> = ({
     setProcessProgress(10);
     setProcessStepText(
       type === 'clear'
-        ? 'Menyiapkan pembersihan data dummy siswa TKA...'
-        : 'Menyiapkan pemulihan 13 data sampel dummy bawaan...'
+        ? 'Menyiapkan penghapusan seluruh data siswa TKA & Google Sheets...'
+        : 'Menyiapkan pemulihan 13 data sampel bawaan...'
     );
 
     setTimeout(() => {
       setProcessProgress(40);
       setProcessStepText(
         type === 'clear'
-          ? 'Menghapus 13 record siswa dummy TKA dari penyimpanan...'
+          ? 'Menghapus record siswa TKA dari database & menyinkronkan ke Google Sheets...'
           : 'Memuat data sampel siswa TKA & target studi lanjut...'
       );
     }, 350);
@@ -97,7 +101,7 @@ export const StudentList: React.FC<StudentListProps> = ({
       setProcessProgress(80);
       setProcessStepText(
         type === 'clear'
-          ? 'Membersihkan indeks data & riwayat simulasi...'
+          ? 'Membersihkan indeks data & memperbarui Google Sheets secara realtime...'
           : 'Menyinkronkan data sampel ke penyimpanan...'
       );
     }, 750);
@@ -106,17 +110,19 @@ export const StudentList: React.FC<StudentListProps> = ({
       setProcessProgress(100);
       setProcessStepText(
         type === 'clear'
-          ? 'Selesai! Seluruh data dummy siswa berhasil dikosongkan.'
-          : 'Selesai! 13 Data sampel dummy berhasil dimuat kembali.'
+          ? 'Selesai! Seluruh data siswa berhasil dihapus (0 siswa).'
+          : 'Selesai! 13 Data sampel berhasil dimuat kembali.'
       );
     }, 1150);
 
     setTimeout(() => {
       if (type === 'clear' && onClearData) {
         onClearData();
-        showToast('Seluruh data dummy siswa berhasil dikosongkan (0 siswa)!');
+        setSelectedIds([]);
+        showToast('Seluruh data siswa TKA berhasil dihapus (0 siswa). Update realtime ke Google Sheets!');
       } else if (type === 'reset') {
         onResetData();
+        setSelectedIds([]);
         showToast('Data siswa berhasil direset ke 13 data sampel bawaan.');
       }
       setIsProcessModalOpen(false);
@@ -277,10 +283,10 @@ export const StudentList: React.FC<StudentListProps> = ({
                   <button
                     onClick={() => setShowConfirmModal('clear')}
                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl border border-rose-200 transition-colors"
-                    title="Kosongkan seluruh data dummy siswa TKA"
+                    title="Hapus seluruh data siswa TKA & Studi Lanjut di database dan Google Sheets"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Kosongkan Dummy</span>
+                    <span>Hapus Data seluruh siswa</span>
                   </button>
                 )}
                 <button
@@ -375,10 +381,36 @@ export const StudentList: React.FC<StudentListProps> = ({
                 Reset Filter
               </button>
             )}
+
+            {/* Filter Delete / Selection Delete Button */}
+            {!isReadOnly &&
+              (selectedIds.length > 0 ||
+                ((selectedKelas !== 'ALL' || selectedMapel !== 'ALL' || selectedStudiLanjut !== 'ALL' || searchQuery) &&
+                  filteredStudents.length > 0)) && (
+                <button
+                  onClick={() => setShowFilterDeleteModal(true)}
+                  className="ml-auto sm:ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all animate-in fade-in"
+                  title="Hapus data siswa hasil filter / terpilih dan update ke Google Sheets"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>
+                    {selectedIds.length > 0
+                      ? `Hapus Data Terpilih (${selectedIds.length})`
+                      : `Hapus Hasil Filter (${filteredStudents.length} Siswa)`}
+                  </span>
+                </button>
+              )}
           </div>
 
-          <div className="text-slate-500 font-medium">
-            Menampilkan <span className="font-bold text-slate-800">{filteredStudents.length}</span> dari {students.length} siswa
+          <div className="text-slate-500 font-medium flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <span className="bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full font-bold text-[11px] border border-indigo-200">
+                {selectedIds.length} terpilih
+              </span>
+            )}
+            <span>
+              Menampilkan <span className="font-bold text-slate-800">{filteredStudents.length}</span> dari {students.length} siswa
+            </span>
           </div>
         </div>
       </div>
@@ -515,7 +547,29 @@ export const StudentList: React.FC<StudentListProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-900 text-slate-100 font-bold tracking-wider uppercase text-[11px]">
-                  <th className="p-3.5 pl-5">Nama Siswa</th>
+                  {!isReadOnly && (
+                    <th className="p-3.5 pl-4 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filteredStudents.length > 0 &&
+                          filteredStudents.every((s) => selectedIds.includes(s.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const allFilteredIds = filteredStudents.map((s) => s.id);
+                            setSelectedIds(Array.from(new Set([...selectedIds, ...allFilteredIds])));
+                          } else {
+                            const filteredSet = new Set(filteredStudents.map((s) => s.id));
+                            setSelectedIds(selectedIds.filter((id) => !filteredSet.has(id)));
+                          }
+                        }}
+                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        title="Pilih / Batalkan semua siswa hasil filter"
+                      />
+                    </th>
+                  )}
+                  <th className="p-3.5 pl-4">Nama Siswa</th>
                   <th className="p-3.5">NIS / NISN</th>
                   <th className="p-3.5">Mapel TKA 1-2</th>
                   <th className="p-3.5">Studi Lanjut</th>
@@ -529,7 +583,7 @@ export const StudentList: React.FC<StudentListProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-12 text-center text-slate-400">
+                    <td colSpan={isReadOnly ? 8 : 9} className="p-12 text-center text-slate-400">
                       <p className="font-semibold text-sm mb-1">
                         Tidak ada data siswa ditemukan
                       </p>
@@ -542,8 +596,26 @@ export const StudentList: React.FC<StudentListProps> = ({
                   paginatedStudents.map((s) => (
                     <tr
                       key={s.id}
-                      className="hover:bg-slate-50/80 transition-colors group"
+                      className={`hover:bg-slate-50/80 transition-colors group ${
+                        selectedIds.includes(s.id) ? 'bg-indigo-50/40' : ''
+                      }`}
                     >
+                      {!isReadOnly && (
+                        <td className="p-3.5 pl-4 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds([...selectedIds, s.id]);
+                              } else {
+                                setSelectedIds(selectedIds.filter((id) => id !== s.id));
+                              }
+                            }}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                          />
+                        </td>
+                      )}
                       {/* Nama Siswa */}
                       <td className="p-3.5 pl-5 font-bold text-slate-800 min-w-[160px]">
                         <div className="flex items-center gap-2">
@@ -736,7 +808,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                 onClick={() => setShowConfirmModal('clear')}
                 className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 underline font-semibold"
               >
-                <Trash2 className="w-3.5 h-3.5" /> Kosongkan Data Dummy (0 Siswa)
+                <Trash2 className="w-3.5 h-3.5" /> Hapus Data seluruh siswa
               </button>
             )}
             <button
@@ -748,6 +820,56 @@ export const StudentList: React.FC<StudentListProps> = ({
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal for Filter / Selected Students Delete */}
+      {showFilterDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  Hapus {selectedIds.length > 0 ? `${selectedIds.length} Siswa Terpilih` : `${filteredStudents.length} Siswa Hasil Filter`}?
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                  Apakah Anda yakin ingin menghapus{' '}
+                  <span className="font-bold text-slate-800">
+                    {selectedIds.length > 0 ? selectedIds.length : filteredStudents.length} data siswa
+                  </span>{' '}
+                  ini? Data akan dihapus dari aplikasi, database Firestore, dan diperbarui secara realtime di Google Sheets.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowFilterDeleteModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  const targetIds = selectedIds.length > 0 ? selectedIds : filteredStudents.map((s) => s.id);
+                  if (onDeleteMultipleStudents) {
+                    onDeleteMultipleStudents(targetIds);
+                  } else {
+                    targetIds.forEach((id) => onDeleteStudent(id));
+                  }
+                  setSelectedIds([]);
+                  setShowFilterDeleteModal(false);
+                  showToast(`Berhasil menghapus ${targetIds.length} data siswa dan memperbarui Google Sheets!`);
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-all"
+              >
+                Ya, Hapus {selectedIds.length > 0 ? `${selectedIds.length} Data` : `${filteredStudents.length} Data`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal for Clear or Reset */}
       {showConfirmModal && (
@@ -764,12 +886,12 @@ export const StudentList: React.FC<StudentListProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-800">
                   {showConfirmModal === 'clear'
-                    ? 'Kosongkan Seluruh Data Dummy Siswa?'
-                    : 'Reset ke 13 Data Sampel Dummy?'}
+                    ? 'Hapus Seluruh Data Siswa TKA & Studi Lanjut?'
+                    : 'Reset ke 13 Data Sampel Bawaan?'}
                 </h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-xs text-slate-500 leading-relaxed mt-1">
                   {showConfirmModal === 'clear'
-                    ? 'Tindakan ini akan mengosongkan seluruh record siswa dummy TKA (menjadi 0 siswa) agar Anda dapat menginput data riil sekolah.'
+                    ? `Tindakan ini akan MENGHAPUS SELURUH (${students.length}) data siswa TKA dari aplikasi, database Firestore, dan Google Sheets secara realtime.`
                     : 'Tindakan ini akan mengembalikan data ke 13 data contoh sampel bawaan.'}
                 </p>
               </div>
@@ -788,7 +910,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                   showConfirmModal === 'clear' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'
                 }`}
               >
-                {showConfirmModal === 'clear' ? 'Ya, Kosongkan Sekarang' : 'Ya, Reset Data Sampel'}
+                {showConfirmModal === 'clear' ? 'Ya, Hapus Seluruh Data' : 'Ya, Reset Data Sampel'}
               </button>
             </div>
           </div>

@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, UserCheck, GraduationCap, Users, KeyRound, Lock, User, Eye, EyeOff, AlertOctagon, Clock, Laptop } from 'lucide-react';
-import { Student } from '../types';
+import { Student, MasterSchoolStudent } from '../types';
 import { getStoredSystemPasswords, getStoredSecurityPolicy, getStoredCustomUsers, addSecurityLog } from '../utils/storage';
 import { sanitizeNis } from '../utils/sanitizer';
 
 interface LoginModalProps {
   onLogin: (role: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'teknisi' | 'siswa', nis?: string) => void;
   students: Student[];
+  masterStudents?: MasterSchoolStudent[];
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, masterStudents = [] }) => {
   const [selectedRole, setSelectedRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'teknisi' | 'siswa'>('superadmin');
   const [passwordInput, setPasswordInput] = useState('');
   const [nisInput, setNisInput] = useState('');
@@ -195,17 +196,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
       return;
     }
 
-    // Check if student exists in database
+    // Check if student exists in database (TKA Students or Master School Students)
     const matchedStudent = students.find(
       (s) => s.nis === cleanNis || (s.nisn && sanitizeNis(s.nisn) === cleanNis) || s.id === cleanNis
     );
 
-    if (matchedStudent) {
+    const matchedMaster = masterStudents.find(
+      (m) => m.nis === cleanNis || (m.nisn && sanitizeNis(m.nisn) === cleanNis) || m.id === cleanNis
+    );
+
+    const studentRecord = matchedStudent || matchedMaster;
+
+    if (studentRecord) {
       const isPassValid =
         pass === cleanNis ||
         pass === 'siswa123' ||
-        pass === matchedStudent.nis ||
-        (matchedStudent.nisn && pass === matchedStudent.nisn);
+        pass === studentRecord.nis ||
+        (studentRecord.nisn && pass === studentRecord.nisn);
 
       if (!isPassValid) {
         const newAttempts = failedAttempts + 1;
@@ -235,7 +242,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
         action: 'STUDENT_LOGIN',
         category: 'AUTH',
         status: 'SUCCESS',
-        details: `Siswa ${matchedStudent.namaSiswa} (NIS: ${cleanNis}) berhasil login`,
+        details: `Siswa ${studentRecord.namaSiswa} (NIS: ${cleanNis}) berhasil login`,
       });
 
       setFailedAttempts(0);

@@ -147,6 +147,13 @@ export function deleteStudent(id: string): void {
   deleteStudentFromFirestore(id);
 }
 
+export function deleteMultipleStudents(ids: string[]): void {
+  const students = getStoredStudents();
+  const filtered = students.filter((s) => !ids.includes(s.id));
+  saveStudents(filtered);
+  ids.forEach((id) => deleteStudentFromFirestore(id));
+}
+
 export function addMultipleStudents(
   newStudentsData: Omit<Student, 'id' | 'updatedAt'>[],
   mode: 'append' | 'overwrite' = 'append'
@@ -177,6 +184,8 @@ export function resetToDefaultData(): Student[] {
 
 export function clearAllStudentsData(): Student[] {
   try {
+    const existing = getStoredStudents();
+    existing.forEach((s) => deleteStudentFromFirestore(s.id));
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
   } catch (err) {}
   return [];

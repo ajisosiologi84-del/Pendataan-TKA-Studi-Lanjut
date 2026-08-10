@@ -280,11 +280,28 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
         ''
       );
 
+      let initNama = editingStudent.namaSiswa || '';
+      let initNis = editingStudent.nis || '';
+      let initNisn = editingStudent.nisn || '';
+      let initKelas = editingStudent.kelas || 'XII Merdeka 1';
+
+      if (!initNama && initNis && masterStudents.length > 0) {
+        const masterFound = masterStudents.find((m) => m.nis === initNis || (m.nisn && m.nisn === initNis));
+        if (masterFound) {
+          initNama = masterFound.namaSiswa;
+          if (!initNisn) initNisn = masterFound.nisn;
+          if (masterFound.kelas) initKelas = masterFound.kelas;
+          setAutoFillNotification(
+            `✓ Data Awal terisi otomatis dari Input Data Sekolah: ${masterFound.namaSiswa} (${initKelas}) - NIS: ${initNis}`
+          );
+        }
+      }
+
       setFormData({
-        namaSiswa: editingStudent.namaSiswa || '',
-        nis: editingStudent.nis || '',
-        nisn: editingStudent.nisn || '',
-        kelas: editingStudent.kelas || 'XII Merdeka 1',
+        namaSiswa: initNama,
+        nis: initNis,
+        nisn: initNisn,
+        kelas: initKelas,
         jenisKelamin: editingStudent.jenisKelamin || 'L',
         mapelTka1: editingStudent.mapelTka1 || MAPEL_TKA_OPTIONS[0],
         mapelTka2: editingStudent.mapelTka2 || MAPEL_TKA_OPTIONS[1],
