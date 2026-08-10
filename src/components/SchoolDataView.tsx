@@ -76,6 +76,9 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     ])
   ).sort();
 
+  // Selection state for multi-delete
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   // Filtered Students
   const filteredStudents = masterStudents.filter((student) => {
     const q = searchQuery.toLowerCase().trim();
@@ -90,6 +93,50 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
     return matchesSearch && matchesKelas;
   });
+
+  const isAllSelected =
+    filteredStudents.length > 0 && filteredStudents.every((s) => selectedIds.includes(s.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredStudents.map((s) => s.id));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (
+      window.confirm(
+        `Apakah Anda yakin ingin menghapus ${selectedIds.length} data siswa sekolah yang dipilih?`
+      )
+    ) {
+      selectedIds.forEach((id) => deleteMasterSchoolStudent(id));
+      setMasterStudents((prev) => prev.filter((s) => !selectedIds.includes(s.id)));
+      setSelectedIds([]);
+    }
+  };
+
+  const handleDeleteAll = () => {
+    if (masterStudents.length === 0) return;
+    if (
+      window.confirm(
+        `⚠️ PERINGATAN BERSAMA: Apakah Anda benar-benar yakin ingin MENGHAPUS SEMUA (${masterStudents.length}) data sekolah master?\n\nTindakan ini tidak dapat dibatalkan.`
+      )
+    ) {
+      masterStudents.forEach((s) => deleteMasterSchoolStudent(s.id));
+      saveMasterSchoolStudents([], true);
+      setMasterStudents([]);
+      setSelectedIds([]);
+    }
+  };
 
   const handleOpenAddModal = () => {
     setEditingItem(null);
@@ -469,7 +516,17 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
           </div>
         </div>
 
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-md shadow-rose-600/20"
+              title="Hapus data yang dicentang"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Hapus Terpilih ({selectedIds.length})
+            </button>
+          )}
+
           <button
             onClick={handleExportExcel}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all"
@@ -477,6 +534,17 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
           >
             <Download className="w-3.5 h-3.5 text-emerald-600" /> Export Excel (.xlsx)
           </button>
+
+          {masterStudents.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all"
+              title="Hapus semua data master sekolah"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Hapus Semua
+            </button>
+          )}
+
           <button
             onClick={handleResetDefault}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
@@ -502,7 +570,16 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200/80 text-slate-600 font-bold uppercase tracking-wider">
-                <th className="py-3 px-4 w-12 text-center">No</th>
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                    title="Pilih Semua / Batal Pilih"
+                  />
+                </th>
+                <th className="py-3 px-3 w-10 text-center">No</th>
                 <th className="py-3 px-4">Nama Siswa</th>
                 <th className="py-3 px-4">NIS</th>
                 <th className="py-3 px-4">NISN</th>
@@ -514,67 +591,83 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="font-bold text-sm text-slate-600">Tidak ada data siswa sekolah yang ditemukan.</p>
                     <p className="text-xs text-slate-400 mt-1">Coba ubah kata kunci pencarian atau tambah data baru.</p>
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student, idx) => (
-                  <tr key={student.id} className="hover:bg-indigo-50/30 transition-colors">
-                    <td className="py-3 px-4 text-center font-bold text-slate-400">{idx + 1}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center justify-center">
-                        {student.namaSiswa.charAt(0).toUpperCase()}
-                      </div>
-                      <span>{student.namaSiswa}</span>
-                    </td>
-                    <td className="py-3 px-4 font-mono font-bold text-indigo-900 bg-indigo-50/50 rounded px-2 py-1 inline-block mt-2">
-                      {student.nis || '-'}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-600">
-                      {student.nisn || '-'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                        {student.kelas}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3" /> Valid Master
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {onNavigateTab && (
+                filteredStudents.map((student, idx) => {
+                  const isSelected = selectedIds.includes(student.id);
+                  return (
+                    <tr
+                      key={student.id}
+                      className={`transition-colors ${
+                        isSelected ? 'bg-indigo-50/70' : 'hover:bg-indigo-50/30'
+                      }`}
+                    >
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectOne(student.id)}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                        />
+                      </td>
+                      <td className="py-3 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center justify-center shrink-0">
+                          {student.namaSiswa.charAt(0).toUpperCase()}
+                        </div>
+                        <span>{student.namaSiswa}</span>
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-indigo-900 bg-indigo-50/50 rounded px-2 py-1 inline-block mt-2">
+                        {student.nis || '-'}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-600">
+                        {student.nisn || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {student.kelas}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" /> Valid Master
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {onNavigateTab && (
+                            <button
+                              onClick={() => onNavigateTab('form')}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
+                              title="Isi Formulir Pendataan Siswa Ini"
+                            >
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
-                            onClick={() => onNavigateTab('form')}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
-                            title="Isi Formulir Pendataan Siswa Ini"
+                            onClick={() => handleOpenEditModal(student)}
+                            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit Data"
                           >
-                            <ArrowRight className="w-4 h-4" />
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleOpenEditModal(student)}
-                          className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                          title="Edit Data"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(student.id, student.namaSiswa)}
-                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="Hapus Data"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <button
+                            onClick={() => handleDelete(student.id, student.namaSiswa)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Hapus Data Ini"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
