@@ -27,15 +27,36 @@ export const systemSettingsCol = collection(db, 'systemSettings');
 
 // Circuit breaker flag for quota exhaustion
 let isQuotaExceeded = false;
+const quotaListeners: Array<(exceeded: boolean) => void> = [];
+
+export function isFirestoreQuotaExceeded(): boolean {
+  return isQuotaExceeded;
+}
+
+export function subscribeQuotaStatus(cb: (exceeded: boolean) => void): () => void {
+  quotaListeners.push(cb);
+  cb(isQuotaExceeded);
+  return () => {
+    const idx = quotaListeners.indexOf(cb);
+    if (idx !== -1) quotaListeners.splice(idx, 1);
+  };
+}
 
 function checkQuotaError(error: any): boolean {
   if (!error) return false;
-  const msg = String(error.message || error);
-  const code = String(error.code || '');
-  if (code === 'resource-exhausted' || msg.includes('Quota exceeded') || msg.includes('resource-exhausted')) {
+  const msg = String(error?.message || error || '');
+  const code = String(error?.code || '');
+  if (
+    code === 'resource-exhausted' ||
+    code.includes('resource-exhausted') ||
+    msg.includes('Quota exceeded') ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('RESOURCE_EXHAUSTED')
+  ) {
     if (!isQuotaExceeded) {
       isQuotaExceeded = true;
-      console.warn('[Firestore] Quota exceeded. Gracefully falling back to localStorage for seamless operation.');
+      console.warn('[Firestore] Quota exceeded limit reached. Gracefully falling back to localStorage mode for uninterrupted portal operations.');
+      quotaListeners.forEach((fn) => fn(true));
     }
     return true;
   }
@@ -144,20 +165,35 @@ export async function fetchSystemSettingsFromFirestore(key: string) {
 
 export function subscribeSystemSettingFromFirestore(key: string, callback: (data: any) => void) {
   if (isQuotaExceeded) return () => {};
-  const docRef = doc(db, 'systemSettings', key);
-  return onSnapshot(
-    docRef,
-    (snap) => {
-      if (snap.exists() && snap.data()?.data !== undefined) {
-        callback(snap.data().data);
+  let unsubber: (() => void) | null = null;
+  try {
+    const docRef = doc(db, 'systemSettings', key);
+    unsubber = onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists() && snap.data()?.data !== undefined) {
+          callback(snap.data().data);
+        }
+      },
+      (error) => {
+        if (checkQuotaError(error)) {
+          if (unsubber) {
+            try { unsubber(); } catch (_) {}
+          }
+        } else {
+          console.warn(`Firestore setting snapshot error (${key}):`, error);
+        }
       }
-    },
-    (error) => {
-      if (!checkQuotaError(error)) {
-        console.warn(`Firestore setting snapshot error (${key}):`, error);
-      }
+    );
+  } catch (err) {
+    checkQuotaError(err);
+  }
+
+  return () => {
+    if (unsubber) {
+      try { unsubber(); } catch (_) {}
     }
-  );
+  };
 }
 
 /**
@@ -165,19 +201,34 @@ export function subscribeSystemSettingFromFirestore(key: string, callback: (data
  */
 export function subscribeStudentsFromFirestore(callback: (students: any[]) => void) {
   if (isQuotaExceeded) return () => {};
-  return onSnapshot(
-    studentsCol,
-    (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((d) => {
-        list.push(d.data());
-      });
-      callback(list);
-    },
-    (error) => {
-      if (!checkQuotaError(error)) {
-        console.warn('Firestore students snapshot error:', error);
+  let unsubber: (() => void) | null = null;
+  try {
+    unsubber = onSnapshot(
+      studentsCol,
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => {
+          list.push(d.data());
+        });
+        callback(list);
+      },
+      (error) => {
+        if (checkQuotaError(error)) {
+          if (unsubber) {
+            try { unsubber(); } catch (_) {}
+          }
+        } else {
+          console.warn('Firestore students snapshot error:', error);
+        }
       }
+    );
+  } catch (err) {
+    checkQuotaError(err);
+  }
+
+  return () => {
+    if (unsubber) {
+      try { unsubber(); } catch (_) {}
     }
-  );
+  };
 }
