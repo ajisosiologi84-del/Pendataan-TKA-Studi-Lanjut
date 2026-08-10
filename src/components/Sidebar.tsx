@@ -18,6 +18,7 @@ import {
   Award,
   BookOpen,
   Calculator,
+  Building2,
 } from 'lucide-react';
 import { NavigationTab, UserRole } from '../types';
 
@@ -61,6 +62,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: totalStudents,
       description: 'Tabel & pencarian siswa',
       roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
+    },
+    {
+      id: 'schoolData',
+      label: 'INPUT DATA SEKOLAH',
+      icon: <Building2 className="w-5 h-5" />,
+      badge: 'Master',
+      description: 'Data awal Master Siswa, NIS, NISN & Kelas',
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
     },
     {
       id: 'form',

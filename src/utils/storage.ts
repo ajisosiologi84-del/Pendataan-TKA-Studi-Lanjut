@@ -6,7 +6,8 @@ import {
   RolePermissions,
   CustomUserAccount,
   SystemSecurityPolicy,
-  ActiveUserSession
+  ActiveUserSession,
+  MasterSchoolStudent,
 } from '../types';
 import {
   syncStudentToFirestore,
@@ -14,12 +15,15 @@ import {
   syncLaptopToFirestore,
   deleteLaptopFromFirestore,
   syncSecurityLogToFirestore,
-  syncSystemSettingsToFirestore
+  syncSystemSettingsToFirestore,
+  syncMasterSchoolStudentToFirestore,
+  deleteMasterSchoolStudentFromFirestore,
 } from '../firebase';
 import { INITIAL_STUDENTS } from '../data/mockStudents';
 import { INITIAL_LAPTOPS } from '../data/mockLaptops';
 
 const STORAGE_KEY = 'tka_studi_lanjut_students_v1';
+const MASTER_SCHOOL_STUDENTS_KEY = 'tka_master_school_students_v1';
 const LAPTOPS_STORAGE_KEY = 'tka_laptops_data_v1';
 const PROKTOR_STORAGE_KEY = 'tka_proktor_teknisi_v1';
 const DOC_SETTINGS_STORAGE_KEY = 'tka_doc_settings_v1';
@@ -497,11 +501,11 @@ export interface SystemPasswords {
 }
 
 export const DEFAULT_SYSTEM_PASSWORDS: SystemPasswords = {
-  superadmin: 'admin123',
-  walikelas: 'walikelas',
-  bk: 'bk',
-  proktor: 'proktor123',
-  teknisi: 'teknisi123',
+  superadmin: 'AdminTKAJunior2026',
+  walikelas: 'WalasTKA2026',
+  bk: 'BKTKA2026',
+  proktor: 'ProktorTKA2026',
+  teknisi: 'TeknisiTKA2026',
 };
 
 export function getStoredSystemPasswords(): SystemPasswords {
@@ -869,6 +873,75 @@ export function clearActiveSessionsExceptCurrent(): void {
   } catch (error) {
     console.error('Error clearing sessions:', error);
   }
+}
+
+// --- MASTER DATA SEKOLAH (NAMA, NIS, NISN, KELAS) ---
+export const DEFAULT_MASTER_SCHOOL_STUDENTS: MasterSchoolStudent[] = [
+  { id: 'mst-101', namaSiswa: 'Ahmad Fauzi', nis: '22231001', nisn: '0061234561', kelas: 'XII Merdeka 1' },
+  { id: 'mst-102', namaSiswa: 'Anisa Rahmawati', nis: '22231002', nisn: '0061234562', kelas: 'XII Merdeka 1' },
+  { id: 'mst-103', namaSiswa: 'Bintang Putra Pratama', nis: '22231003', nisn: '0061234563', kelas: 'XII Merdeka 2' },
+  { id: 'mst-104', namaSiswa: 'Citra Dewi Kartika', nis: '22231004', nisn: '0061234564', kelas: 'XII Merdeka 2' },
+  { id: 'mst-105', namaSiswa: 'Daffa Rizky Ramadhan', nis: '22231005', nisn: '0061234565', kelas: 'XII Merdeka 3' },
+  { id: 'mst-106', namaSiswa: 'Eka Nur Syamsiah', nis: '22231006', nisn: '0061234566', kelas: 'XII Merdeka 3' },
+  { id: 'mst-107', namaSiswa: 'Farhan Aditya Nugraha', nis: '22231007', nisn: '0061234567', kelas: 'XII Merdeka 4' },
+  { id: 'mst-108', namaSiswa: 'Gita Savitri Maharani', nis: '22231008', nisn: '0061234568', kelas: 'XII Merdeka 4' },
+];
+
+export function getStoredMasterSchoolStudents(): MasterSchoolStudent[] {
+  try {
+    const raw = localStorage.getItem(MASTER_SCHOOL_STUDENTS_KEY);
+    if (!raw) {
+      localStorage.setItem(MASTER_SCHOOL_STUDENTS_KEY, JSON.stringify(DEFAULT_MASTER_SCHOOL_STUDENTS));
+      DEFAULT_MASTER_SCHOOL_STUDENTS.forEach((item) => {
+        syncMasterSchoolStudentToFirestore(item);
+      });
+      return DEFAULT_MASTER_SCHOOL_STUDENTS;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : DEFAULT_MASTER_SCHOOL_STUDENTS;
+  } catch (error) {
+    console.error('Error reading master school students:', error);
+    return DEFAULT_MASTER_SCHOOL_STUDENTS;
+  }
+}
+
+export function saveMasterSchoolStudents(list: MasterSchoolStudent[], syncRemote = true): void {
+  try {
+    localStorage.setItem(MASTER_SCHOOL_STUDENTS_KEY, JSON.stringify(list));
+    if (syncRemote) {
+      list.forEach((item) => {
+        syncMasterSchoolStudentToFirestore(item);
+      });
+    }
+  } catch (error) {
+    console.error('Error saving master school students:', error);
+  }
+}
+
+export function addMasterSchoolStudent(item: Omit<MasterSchoolStudent, 'id'>): MasterSchoolStudent {
+  const current = getStoredMasterSchoolStudents();
+  const newItem: MasterSchoolStudent = {
+    ...item,
+    id: 'mst-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const updated = [newItem, ...current];
+  saveMasterSchoolStudents(updated);
+  return newItem;
+}
+
+export function updateMasterSchoolStudent(item: MasterSchoolStudent): void {
+  const current = getStoredMasterSchoolStudents();
+  const updated = current.map((s) => (s.id === item.id ? { ...item, updatedAt: new Date().toISOString() } : s));
+  saveMasterSchoolStudents(updated);
+}
+
+export function deleteMasterSchoolStudent(id: string): void {
+  const current = getStoredMasterSchoolStudents();
+  const updated = current.filter((s) => s.id !== id);
+  saveMasterSchoolStudents(updated, false);
+  deleteMasterSchoolStudentFromFirestore(id);
 }
 
 

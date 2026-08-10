@@ -44,6 +44,7 @@ import {
   PrestasiItem,
   JenisPrestasi,
   TingkatPrestasi,
+  MasterSchoolStudent,
 } from '../types';
 import { MAPEL_TKA_OPTIONS, PRODI_POPULAR_OPTIONS, UNIVERSITAS_POPULAR_OPTIONS } from '../data/mockStudents';
 import { MAPEL_PILIHAN_845_LIST, MapelPilihanData } from '../data/mapelPilihanData';
@@ -67,6 +68,7 @@ interface StudentFormViewProps {
   onClearPrefilledBanPt?: () => void;
   userRole?: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null;
   isStudentFormOpen?: boolean;
+  masterStudents?: MasterSchoolStudent[];
 }
 
 export const StudentFormView: React.FC<StudentFormViewProps> = ({
@@ -78,6 +80,7 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
   onClearPrefilledBanPt,
   userRole,
   isStudentFormOpen = true,
+  masterStudents = [],
 }) => {
   const [formData, setFormData] = useState({
     namaSiswa: '',
@@ -120,6 +123,29 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
   const [banPtSearchJenjang, setBanPtSearchJenjang] = useState('ALL');
   const [banPtSearchAkreditasi, setBanPtSearchAkreditasi] = useState('ALL');
   const [banPtAlertMessage, setBanPtAlertMessage] = useState<string | null>(null);
+
+  // Master Student Auto-Fill search state
+  const [selectedMasterId, setSelectedMasterId] = useState('');
+  const [autoFillNotification, setAutoFillNotification] = useState<string | null>(null);
+
+  const handleSelectMasterStudent = (masterId: string) => {
+    setSelectedMasterId(masterId);
+    if (!masterId) return;
+    const found = masterStudents.find((m) => m.id === masterId);
+    if (found) {
+      setFormData((prev) => ({
+        ...prev,
+        namaSiswa: found.namaSiswa,
+        nis: found.nis,
+        nisn: found.nisn,
+        kelas: found.kelas || prev.kelas,
+      }));
+      setAutoFillNotification(
+        `✓ Data otomatis terisi dari Master Data Sekolah: ${found.namaSiswa} (${found.kelas}) - NIS: ${found.nis}, NISN: ${found.nisn}`
+      );
+      setTimeout(() => setAutoFillNotification(null), 6000);
+    }
+  };
 
   // Effect to handle selection coming from BAN-PT main menu directory
   useEffect(() => {
@@ -750,6 +776,45 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* AUTO-FILL DARI INPUT DATA SEKOLAH */}
+            {masterStudents.length > 0 && (
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200/80 p-4 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-indigo-950 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-indigo-600" />
+                    ⚡ Auto-Fill Otomatis dari Input Data Sekolah
+                  </label>
+                  <span className="text-[10px] bg-indigo-200/60 text-indigo-800 font-extrabold px-2 py-0.5 rounded-full">
+                    {masterStudents.length} Master Siswa
+                  </span>
+                </div>
+                
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Pilih nama Anda dari data master sekolah untuk langsung mengisi <strong>Nama Siswa, NIS, NISN, dan Kelas</strong> secara otomatis:
+                </p>
+
+                <select
+                  value={selectedMasterId}
+                  onChange={(e) => handleSelectMasterStudent(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                >
+                  <option value="">-- Pilih Nama Siswa dari Input Data Sekolah --</option>
+                  {masterStudents.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.namaSiswa} — {m.kelas} (NIS: {m.nis} | NISN: {m.nisn})
+                    </option>
+                  ))}
+                </select>
+
+                {autoFillNotification && (
+                  <div className="p-2.5 bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{autoFillNotification}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Nama Siswa */}

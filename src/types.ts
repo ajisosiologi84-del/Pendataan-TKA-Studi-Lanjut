@@ -41,7 +41,17 @@ export interface Student {
   updatedAt: string;
 }
 
-export type NavigationTab = 'dashboard' | 'students' | 'form' | 'analysis' | 'appscript' | 'laptop' | 'settings' | 'banpt' | 'mapelPilihan' | 'snbpCalc';
+export type NavigationTab = 'dashboard' | 'students' | 'schoolData' | 'form' | 'analysis' | 'appscript' | 'laptop' | 'settings' | 'banpt' | 'mapelPilihan' | 'snbpCalc';
+
+export interface MasterSchoolStudent {
+  id: string;
+  namaSiswa: string;
+  nis: string;
+  nisn: string;
+  kelas: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export type StatusKelayakanLaptop = 'LAYAK' | 'TIDAK LAYAK';
 

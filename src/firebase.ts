@@ -21,6 +21,7 @@ export const db = firebaseConfig.firestoreDatabaseId
 
 // Collection References
 export const studentsCol = collection(db, 'students');
+export const masterSchoolStudentsCol = collection(db, 'masterSchoolStudents');
 export const laptopsCol = collection(db, 'laptops');
 export const securityLogsCol = collection(db, 'securityLogs');
 export const systemSettingsCol = collection(db, 'systemSettings');
@@ -153,6 +154,65 @@ export function subscribeLaptopsFromFirestore(callback: (laptops: any[]) => void
           }
         } else {
           console.warn('Firestore laptops snapshot error:', error);
+        }
+      }
+    );
+  } catch (err) {
+    checkQuotaError(err);
+  }
+
+  return () => {
+    if (unsubber) {
+      try { unsubber(); } catch (_) {}
+    }
+  };
+}
+
+export async function syncMasterSchoolStudentToFirestore(studentData: any) {
+  if (isQuotaExceeded) return;
+  try {
+    if (!studentData || !studentData.id) return;
+    const docRef = doc(db, 'masterSchoolStudents', String(studentData.id));
+    await setDoc(docRef, { ...studentData, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (error) {
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore sync master student error:', error);
+    }
+  }
+}
+
+export async function deleteMasterSchoolStudentFromFirestore(id: string) {
+  if (isQuotaExceeded) return;
+  try {
+    const docRef = doc(db, 'masterSchoolStudents', String(id));
+    await deleteDoc(docRef);
+  } catch (error) {
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore delete master student error:', error);
+    }
+  }
+}
+
+export function subscribeMasterSchoolStudentsFromFirestore(callback: (students: any[]) => void) {
+  if (isQuotaExceeded) return () => {};
+  let unsubber: (() => void) | null = null;
+  try {
+    unsubber = onSnapshot(
+      masterSchoolStudentsCol,
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => {
+          list.push(d.data());
+        });
+        callback(list);
+      },
+      (error) => {
+        if (checkQuotaError(error)) {
+          if (unsubber) {
+            try { unsubber(); } catch (_) {}
+          }
+        } else {
+          console.warn('Firestore master students snapshot error:', error);
         }
       }
     );

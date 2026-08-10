@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavigationTab, Student, LaptopData, ProktorTeknisi, DocumentSettings, UserRole } from './types';
+import { NavigationTab, Student, LaptopData, ProktorTeknisi, DocumentSettings, UserRole, MasterSchoolStudent } from './types';
 import {
   getStoredStudents,
   addStudent,
@@ -32,6 +32,8 @@ import {
   getStoredStudentFormAccess,
   saveStudentFormAccess,
   isExcludedStudentName,
+  getStoredMasterSchoolStudents,
+  saveMasterSchoolStudents,
 } from './utils/storage';
 import {
   subscribeStudentsFromFirestore,
@@ -39,12 +41,14 @@ import {
   syncStudentToFirestore,
   deleteStudentFromFirestore,
   fetchSystemSettingsFromFirestore,
-  subscribeSystemSettingFromFirestore
+  subscribeSystemSettingFromFirestore,
+  subscribeMasterSchoolStudentsFromFirestore,
 } from './firebase';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { StudentList } from './components/StudentList';
+import { SchoolDataView } from './components/SchoolDataView';
 import { StudentFormView } from './components/StudentFormView';
 import { TkaAnalysisView } from './components/TkaAnalysisView';
 import { AppsScriptView } from './components/AppsScriptView';
@@ -74,6 +78,7 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
   const [students, setStudents] = useState<Student[]>([]);
+  const [masterSchoolStudents, setMasterSchoolStudents] = useState<MasterSchoolStudent[]>(getStoredMasterSchoolStudents);
   const [laptops, setLaptops] = useState<LaptopData[]>([]);
   const [proktorList, setProktorList] = useState<ProktorTeknisi[]>([]);
   const [docSettings, setDocSettings] = useState<DocumentSettings>(DEFAULT_DOCUMENT_SETTINGS);
@@ -212,6 +217,14 @@ export default function App() {
       }
     });
 
+    // Real-time listener for Master School Students collection
+    const unsubMasterStudents = subscribeMasterSchoolStudentsFromFirestore((remoteMaster) => {
+      if (remoteMaster && remoteMaster.length > 0) {
+        setMasterSchoolStudents(remoteMaster);
+        saveMasterSchoolStudents(remoteMaster, false);
+      }
+    });
+
     // Real-time listener for Laptops collection
     const unsubLaptops = subscribeLaptopsFromFirestore((remoteLaptops) => {
       if (remoteLaptops && remoteLaptops.length > 0) {
@@ -261,6 +274,7 @@ export default function App() {
       unsubProktor();
       unsubDocSettings();
       unsubLaptops();
+      unsubMasterStudents();
       unsubscribeGasUrl();
       unsubscribeFormAccess();
       unsubscribeStudents();
@@ -773,6 +787,15 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'schoolData' && (
+            <SchoolDataView
+              masterStudents={masterSchoolStudents}
+              setMasterStudents={setMasterSchoolStudents}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              userRole={userRole}
+            />
+          )}
+
           {activeTab === 'form' && (
             <StudentFormView
               editingStudent={editingStudent}
@@ -790,6 +813,7 @@ export default function App() {
               onClearPrefilledBanPt={() => setPendingBanPtSelection(null)}
               userRole={userRole}
               isStudentFormOpen={isStudentFormOpen}
+              masterStudents={masterSchoolStudents}
             />
           )}
 
