@@ -120,19 +120,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'appscript',
-      label: 'Google Apps Script',
+      label: 'Google Apps Script Integration Hub',
       icon: <Code2 className="w-5 h-5" />,
       badge: appsScriptUrl ? 'Aktif' : 'Setup',
-      description: 'Integrasi Google Sheets',
-      roles: ['superadmin'],
+      description: 'Pusat Integrasi & Generator Google Sheets Backend',
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'settings',
-      label: 'Pengaturan Portal',
+      label: 'Portal Pengaturan & Konfigurasi Portal TKA',
       icon: <Settings className="w-5 h-5" />,
       badge: 'Admin',
-      description: 'Kop Surat, Lab & Reset Data',
-      roles: ['superadmin'],
+      description: 'Kop Surat, Lab, Password, Hak Akses & Reset Data',
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
   ];
 

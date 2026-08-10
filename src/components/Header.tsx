@@ -49,7 +49,12 @@ export const Header: React.FC<HeaderProps> = ({
       case 'appscript':
         return {
           title: 'Google Apps Script Integration Hub',
-          subtitle: 'Integrasi otomatis spreadsheet Google Apps Script (Code.gs)',
+          subtitle: 'Pusat Integrasi & Generator Google Sheets Backend (Code.gs)',
+        };
+      case 'settings':
+        return {
+          title: 'Portal Pengaturan & Konfigurasi Portal TKA',
+          subtitle: 'Kop Surat, Sarana Lab, Password, Hak Akses, Backup & Reset Data',
         };
       case 'laptop':
         return {

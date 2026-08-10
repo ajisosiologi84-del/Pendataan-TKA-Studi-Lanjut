@@ -709,12 +709,8 @@ export default function App() {
             alert('Siswa hanya dapat mengakses formulir pengisian data, Direktori BAN-PT, dan Mata Pelajaran Pilihan.');
             return;
           }
-          if ((userRole === 'walikelas' || userRole === 'bk') && (tab === 'form' || tab === 'appscript' || tab === 'settings')) {
-            alert('Wali Kelas dan Guru BK tidak memiliki akses ke menu ini.');
-            return;
-          }
-          if (userRole === 'proktor' && (tab === 'form' || tab === 'appscript' || tab === 'settings')) {
-            alert('Akses Proktor/Teknisi dikhususkan untuk Pendataan Laptop & Sarana Lab TKA, Overview, Data Siswa, serta Referensi PTN.');
+          if ((userRole === 'walikelas' || userRole === 'bk') && tab === 'form') {
+            alert('Wali Kelas dan Guru BK mengisi data melalui menu Data Siswa.');
             return;
           }
           setActiveTab(tab);
@@ -840,9 +836,9 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'appscript' && userRole === 'superadmin' && <AppsScriptView />}
+          {activeTab === 'appscript' && userRole !== 'siswa' && <AppsScriptView />}
 
-          {activeTab === 'settings' && userRole === 'superadmin' && (
+          {activeTab === 'settings' && userRole !== 'siswa' && (
             <SettingsView
               docSettings={docSettings}
               onSaveDocSettings={handleSaveDocSettings}
