@@ -64,6 +64,12 @@ export const DEFAULT_DOCUMENT_SETTINGS: DocumentSettings = {
     'Lembar verifikasi kelengkapan hardware (Charger, Mouse, Keyboard) dan penentuan status kelayakan (LAYAK / TIDAK LAYAK) oleh Tim Teknisi Komputer.',
 };
 
+export function isExcludedStudentName(name: string): boolean {
+  if (!name) return false;
+  const lower = name.trim().toLowerCase();
+  return lower.includes('rania') || lower.includes('aji');
+}
+
 export function getStoredStudents(): Student[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -74,7 +80,12 @@ export function getStoredStudents(): Student[] {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       const clean = parsed.filter(
-        (s: Student) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+        (s: Student) => {
+          if (!s || !s.id) return false;
+          if (/^std-1[0-2][0-9]$/.test(s.id) || s.id === 'std-101') return false;
+          if (isExcludedStudentName(s.namaSiswa)) return false;
+          return true;
+        }
       );
       if (clean.length !== parsed.length) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));

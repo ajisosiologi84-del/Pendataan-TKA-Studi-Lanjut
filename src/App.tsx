@@ -31,6 +31,7 @@ import {
   saveSecurityPolicy,
   getStoredStudentFormAccess,
   saveStudentFormAccess,
+  isExcludedStudentName,
 } from './utils/storage';
 import {
   subscribeStudentsFromFirestore,
@@ -170,13 +171,13 @@ export default function App() {
     const unsubscribeStudents = subscribeStudentsFromFirestore((remoteStudents) => {
       if (remoteStudents && remoteStudents.length > 0) {
         const cleanRemote = remoteStudents.filter(
-          (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+          (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101' && !isExcludedStudentName(s.namaSiswa)
         );
         setStudents(cleanRemote);
         saveStudents(cleanRemote);
       } else {
         const cleanLocal = getStoredStudents().filter(
-          (s) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+          (s) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101' && !isExcludedStudentName(s.namaSiswa)
         );
         setStudents(cleanLocal);
         saveStudents(cleanLocal);
