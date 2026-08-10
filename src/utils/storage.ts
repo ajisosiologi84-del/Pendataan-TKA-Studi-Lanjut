@@ -18,6 +18,8 @@ import {
   syncSystemSettingsToFirestore,
   syncMasterSchoolStudentToFirestore,
   deleteMasterSchoolStudentFromFirestore,
+  deleteMultipleMasterSchoolStudentsFromFirestore,
+  clearAllMasterSchoolStudentsFromFirestore,
 } from '../firebase';
 import { INITIAL_STUDENTS } from '../data/mockStudents';
 import { INITIAL_LAPTOPS } from '../data/mockLaptops';
@@ -942,6 +944,24 @@ export function deleteMasterSchoolStudent(id: string): void {
   const updated = current.filter((s) => s.id !== id);
   saveMasterSchoolStudents(updated, false);
   deleteMasterSchoolStudentFromFirestore(id);
+}
+
+export function deleteMultipleMasterSchoolStudents(ids: string[]): void {
+  const current = getStoredMasterSchoolStudents();
+  const updated = current.filter((s) => !ids.includes(s.id));
+  saveMasterSchoolStudents(updated, false);
+  deleteMultipleMasterSchoolStudentsFromFirestore(ids);
+}
+
+export function clearAllMasterSchoolStudents(knownStudents?: MasterSchoolStudent[]): void {
+  saveMasterSchoolStudents([], false);
+  clearAllMasterSchoolStudentsFromFirestore();
+  if (knownStudents && knownStudents.length > 0) {
+    knownStudents.forEach((s) => deleteMasterSchoolStudentFromFirestore(s.id));
+  } else {
+    const current = getStoredMasterSchoolStudents();
+    current.forEach((s) => deleteMasterSchoolStudentFromFirestore(s.id));
+  }
 }
 
 

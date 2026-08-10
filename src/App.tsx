@@ -219,7 +219,7 @@ export default function App() {
 
     // Real-time listener for Master School Students collection
     const unsubMasterStudents = subscribeMasterSchoolStudentsFromFirestore((remoteMaster) => {
-      if (remoteMaster && remoteMaster.length > 0) {
+      if (Array.isArray(remoteMaster)) {
         setMasterSchoolStudents(remoteMaster);
         saveMasterSchoolStudents(remoteMaster, false);
       }

@@ -26,6 +26,8 @@ import {
   addMasterSchoolStudent,
   updateMasterSchoolStudent,
   deleteMasterSchoolStudent,
+  deleteMultipleMasterSchoolStudents,
+  clearAllMasterSchoolStudents,
   saveMasterSchoolStudents,
   DEFAULT_MASTER_SCHOOL_STUDENTS,
 } from '../utils/storage';
@@ -79,6 +81,15 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
   // Selection state for multi-delete
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Confirmation Modal State (replaces window.confirm)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'selected' | 'all' | 'reset';
+    title: string;
+    message: string;
+    targetId?: string;
+  } | null>(null);
+
   // Filtered Students
   const filteredStudents = masterStudents.filter((student) => {
     const q = searchQuery.toLowerCase().trim();
@@ -113,29 +124,68 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
-    if (
-      window.confirm(
-        `Apakah Anda yakin ingin menghapus ${selectedIds.length} data siswa sekolah yang dipilih?`
-      )
-    ) {
-      selectedIds.forEach((id) => deleteMasterSchoolStudent(id));
-      setMasterStudents((prev) => prev.filter((s) => !selectedIds.includes(s.id)));
-      setSelectedIds([]);
-    }
+    setConfirmModal({
+      isOpen: true,
+      type: 'selected',
+      title: 'Hapus Data Terpilih?',
+      message: `Apakah Anda yakin ingin menghapus ${selectedIds.length} data siswa sekolah yang dipilih?`,
+    });
   };
 
   const handleDeleteAll = () => {
     if (masterStudents.length === 0) return;
-    if (
-      window.confirm(
-        `⚠️ PERINGATAN BERSAMA: Apakah Anda benar-benar yakin ingin MENGHAPUS SEMUA (${masterStudents.length}) data sekolah master?\n\nTindakan ini tidak dapat dibatalkan.`
-      )
-    ) {
-      masterStudents.forEach((s) => deleteMasterSchoolStudent(s.id));
-      saveMasterSchoolStudents([], true);
+    setConfirmModal({
+      isOpen: true,
+      type: 'all',
+      title: 'Hapus Semua Data Sekolah?',
+      message: `Apakah Anda benar-benar yakin ingin MENGHAPUS SEMUA (${masterStudents.length} siswa) data sekolah master? Tindakan ini tidak dapat dibatalkan.`,
+    });
+  };
+
+  const handleDelete = (id: string, nama: string) => {
+    setConfirmModal({
+      isOpen: true,
+      type: 'single',
+      title: 'Hapus Data Siswa?',
+      message: `Apakah Anda yakin ingin menghapus data master "${nama}"?`,
+      targetId: id,
+    });
+  };
+
+  const handleResetDefault = () => {
+    setConfirmModal({
+      isOpen: true,
+      type: 'reset',
+      title: 'Muat Contoh Data Bawaan?',
+      message: 'Reset data sekolah ke 8 data contoh bawaan? Seluruh data yang ada saat ini akan digantikan.',
+    });
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmModal) return;
+
+    if (confirmModal.type === 'all') {
+      clearAllMasterSchoolStudents(masterStudents);
       setMasterStudents([]);
       setSelectedIds([]);
+    } else if (confirmModal.type === 'selected') {
+      deleteMultipleMasterSchoolStudents(selectedIds);
+      setMasterStudents((prev) => prev.filter((s) => !selectedIds.includes(s.id)));
+      setSelectedIds([]);
+    } else if (confirmModal.type === 'single' && confirmModal.targetId) {
+      deleteMasterSchoolStudent(confirmModal.targetId);
+      setMasterStudents((prev) => prev.filter((s) => s.id !== confirmModal.targetId));
+      setSelectedIds((prev) => prev.filter((i) => i !== confirmModal.targetId));
+      if (editingItem?.id === confirmModal.targetId) {
+        setIsAddEditModalOpen(false);
+        setEditingItem(null);
+      }
+    } else if (confirmModal.type === 'reset') {
+      saveMasterSchoolStudents(DEFAULT_MASTER_SCHOOL_STUDENTS, true);
+      setMasterStudents(DEFAULT_MASTER_SCHOOL_STUDENTS);
     }
+
+    setConfirmModal(null);
   };
 
   const handleOpenAddModal = () => {
@@ -198,20 +248,6 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     }
 
     setIsAddEditModalOpen(false);
-  };
-
-  const handleDelete = (id: string, nama: string) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus data master "${nama}"?`)) {
-      deleteMasterSchoolStudent(id);
-      setMasterStudents((prev) => prev.filter((s) => s.id !== id));
-    }
-  };
-
-  const handleResetDefault = () => {
-    if (window.confirm('Reset data sekolah ke data bawaan contoh? Semua perubahan lokal akan disesuaikan.')) {
-      saveMasterSchoolStudents(DEFAULT_MASTER_SCHOOL_STUDENTS);
-      setMasterStudents(DEFAULT_MASTER_SCHOOL_STUDENTS);
-    }
   };
 
   const handleDownloadTemplate = () => {
@@ -751,20 +787,33 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
                 </select>
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddEditModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30"
-                >
-                  {editingItem ? 'Simpan Perubahan' : 'Tambah Data'}
-                </button>
+              <div className="pt-3 flex items-center justify-between gap-2 border-t border-slate-100">
+                {editingItem ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(editingItem.id, editingItem.namaSiswa)}
+                    className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Hapus Siswa
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddEditModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30"
+                  >
+                    {editingItem ? 'Simpan Perubahan' : 'Tambah Data'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -911,6 +960,41 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
                   Simpan {importPreview.length} Data Ke Database
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Confirmation Modal */}
+      {confirmModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-3 rounded-2xl ${confirmModal.type === 'reset' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">{confirmModal.message}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                className={`px-5 py-2 text-white font-bold text-xs rounded-xl transition-all shadow-md ${
+                  confirmModal.type === 'reset'
+                    ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
+                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
+                }`}
+              >
+                {confirmModal.type === 'reset' ? 'Ya, Muat Contoh' : 'Ya, Hapus Sekarang'}
+              </button>
             </div>
           </div>
         </div>

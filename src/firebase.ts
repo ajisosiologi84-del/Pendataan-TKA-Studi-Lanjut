@@ -193,6 +193,31 @@ export async function deleteMasterSchoolStudentFromFirestore(id: string) {
   }
 }
 
+export async function deleteMultipleMasterSchoolStudentsFromFirestore(ids: string[]) {
+  if (isQuotaExceeded) return;
+  try {
+    const deletePromises = ids.map((id) => deleteDoc(doc(db, 'masterSchoolStudents', String(id))));
+    await Promise.all(deletePromises);
+  } catch (error) {
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore delete multiple master students error:', error);
+    }
+  }
+}
+
+export async function clearAllMasterSchoolStudentsFromFirestore() {
+  if (isQuotaExceeded) return;
+  try {
+    const snapshot = await getDocs(masterSchoolStudentsCol);
+    const deletePromises = snapshot.docs.map((d) => deleteDoc(doc(db, 'masterSchoolStudents', d.id)));
+    await Promise.all(deletePromises);
+  } catch (error) {
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore clear all master students error:', error);
+    }
+  }
+}
+
 export function subscribeMasterSchoolStudentsFromFirestore(callback: (students: any[]) => void) {
   if (isQuotaExceeded) return () => {};
   let unsubber: (() => void) | null = null;
