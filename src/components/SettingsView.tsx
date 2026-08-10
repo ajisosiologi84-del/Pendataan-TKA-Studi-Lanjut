@@ -299,6 +299,8 @@ interface SettingsViewProps {
   onResetLaptopsData: () => void;
   totalStudents: number;
   totalLaptops: number;
+  isStudentFormOpen?: boolean;
+  onToggleStudentFormAccess?: (open: boolean) => void;
   onDataRestored?: () => void;
 }
 
@@ -317,6 +319,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onResetLaptopsData,
   totalStudents,
   totalLaptops,
+  isStudentFormOpen = true,
+  onToggleStudentFormAccess,
   onDataRestored,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'kop' | 'proktor' | 'appscript' | 'database' | 'backup' | 'security' | 'auditlog'>('kop');
@@ -957,6 +961,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             Pengaturan berhasil disimpan!
           </div>
         )}
+      </div>
+
+      {/* Tombol Buka Tutup Akses Formulir Pendataan Siswa */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold shadow-md shrink-0 ${
+            isStudentFormOpen
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+          }`}>
+            {isStudentFormOpen ? <CheckCircle2 className="w-6 h-6 text-emerald-400" /> : <Lock className="w-6 h-6 text-rose-400" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-extrabold text-base tracking-tight text-white">
+                Kontrol Akses Formulir Pendataan Siswa
+              </h3>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase border ${
+                isStudentFormOpen
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+              }`}>
+                {isStudentFormOpen ? 'STATUS: DIBUKA' : 'STATUS: DITUTUP'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {isStudentFormOpen
+                ? 'Siswa diperbolehkan mengakses, mengisi, dan memperbarui data pilihan TKA & Studi Lanjut.'
+                : 'Akses siswa ke Formulir Pendataan Siswa saat ini DITUTUP / DIBATASI oleh Admin.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleStudentFormAccess?.(!isStudentFormOpen)}
+            className={`px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all active:scale-95 ${
+              isStudentFormOpen
+                ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
+            }`}
+          >
+            {isStudentFormOpen ? (
+              <>
+                <Lock className="w-4 h-4" />
+                <span>TUTUP AKSES FORMULIR SISWA</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>BUKA AKSES FORMULIR SISWA</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Sub-navigation Tabs */}

@@ -65,6 +65,8 @@ interface StudentFormViewProps {
   onOpenBanPtDirectory?: () => void;
   prefilledBanPtSelection?: BanPtSelectionItem | null;
   onClearPrefilledBanPt?: () => void;
+  userRole?: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null;
+  isStudentFormOpen?: boolean;
 }
 
 export const StudentFormView: React.FC<StudentFormViewProps> = ({
@@ -74,6 +76,8 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
   onOpenBanPtDirectory,
   prefilledBanPtSelection,
   onClearPrefilledBanPt,
+  userRole,
+  isStudentFormOpen = true,
 }) => {
   const [formData, setFormData] = useState({
     namaSiswa: '',
@@ -373,6 +377,12 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (userRole === 'siswa' && !isStudentFormOpen) {
+      alert('Akses Formulir Pendataan Siswa saat ini sedang DITUTUP oleh Admin / Panitia.');
+      return;
+    }
+
     if (!formData.namaSiswa.trim() || !formData.nis.trim() || !formData.nisn.trim()) {
       alert('Mohon isi Nama Siswa, NIS, dan NISN secara lengkap.');
       return;
@@ -483,6 +493,28 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
             </span>
           </div>
         </div>
+
+        {/* BANNER ACCESS CLOSED WARNING FOR SISWA */}
+        {userRole === 'siswa' && !isStudentFormOpen && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-5 mb-4 text-amber-900 shadow-md flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center shrink-0 text-amber-700 border border-amber-500/30">
+              <ShieldAlert className="w-6 h-6 text-amber-600" />
+            </div>
+            <div className="flex-1 text-center sm:text-left space-y-1">
+              <div className="flex items-center gap-2 justify-center sm:justify-start">
+                <h3 className="font-extrabold text-base text-amber-950">
+                  Akses Formulir Pendataan Siswa Sedang DITUTUP
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white uppercase tracking-wider">
+                  DITUTUP ADMIN
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                Pengisian dan pembaruan data Formulir Pendataan Siswa TKA &amp; Studi Lanjut saat ini sedang <strong>DITUTUP oleh Admin/Panitia Sekolah</strong>. Anda masih dapat melihat data Anda, tetapi tidak dapat mengubah data. Silakan hubungi Wali Kelas atau Admin Sekolah jika Anda membutuhkan bantuan perbaikan data.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* PANDUAN LANGKAH PENGISIAN FORM & CETAK BUKTI PDF UNTUK SISWA */}
         <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-4 lg:p-5 shadow-lg border border-indigo-700/50 space-y-4">
@@ -1859,11 +1891,24 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 transition-all disabled:opacity-50"
+                disabled={isSubmitting || (userRole === 'siswa' && !isStudentFormOpen)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all ${
+                  userRole === 'siswa' && !isStudentFormOpen
+                    ? 'bg-slate-400 cursor-not-allowed shadow-none'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 disabled:opacity-50'
+                }`}
               >
-                <Save className="w-4 h-4" />
-                <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Data Siswa'}</span>
+                {userRole === 'siswa' && !isStudentFormOpen ? (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>Akses Formulir Ditutup Admin</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Data Siswa'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

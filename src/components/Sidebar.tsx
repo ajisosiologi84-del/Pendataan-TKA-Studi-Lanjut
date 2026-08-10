@@ -30,6 +30,7 @@ interface SidebarProps {
   setIsMobileOpen: (open: boolean) => void;
   userRole: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null;
   currentUserNis?: string | null;
+  isStudentFormOpen?: boolean;
   onLogout: () => void;
 }
 
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsMobileOpen,
   userRole,
   currentUserNis,
+  isStudentFormOpen = true,
   onLogout,
 }) => {
   const allNavItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string | number; description: string; roles: ('superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa')[] }[] = [
@@ -64,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'form',
       label: userRole === 'siswa' ? 'Formulir Data Siswa Saya' : 'Form Input Data',
       icon: <UserPlus className="w-5 h-5" />,
+      badge: userRole === 'siswa' ? (isStudentFormOpen ? 'Akses Buka' : 'Ditutup') : undefined,
       description: userRole === 'siswa' ? 'Isi/Update NIS Anda' : 'Isian Mapel TKA & Prodi',
       roles: ['superadmin', 'walikelas', 'bk', 'siswa'],
     },

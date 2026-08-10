@@ -23,6 +23,7 @@ const LAPTOPS_STORAGE_KEY = 'tka_laptops_data_v1';
 const PROKTOR_STORAGE_KEY = 'tka_proktor_teknisi_v1';
 const DOC_SETTINGS_STORAGE_KEY = 'tka_doc_settings_v1';
 const GAS_URL_KEY = 'tka_apps_script_url_v1';
+const FORM_ACCESS_KEY = 'tka_student_form_access_v1';
 
 export const DEFAULT_PROKTOR_TEKNISI: ProktorTeknisi[] = [
   {
@@ -72,17 +73,10 @@ export function getStoredStudents(): Student[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      // Filter out any 13 sample dummy student records
       const clean = parsed.filter(
         (s: Student) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
       );
       if (clean.length !== parsed.length) {
-        // Also delete them from Firestore
-        parsed.forEach((s: Student) => {
-          if (s && s.id && /^std-1[0-2][0-9]$/.test(s.id)) {
-            deleteStudentFromFirestore(s.id);
-          }
-        });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
       }
       return clean;
@@ -164,25 +158,8 @@ export function resetToDefaultData(): Student[] {
 
 export function clearAllStudentsData(): Student[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        parsed.forEach((s: Student) => {
-          if (s && s.id) {
-            deleteStudentFromFirestore(s.id);
-          }
-        });
-      }
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
   } catch (err) {}
-  
-  // Explicitly remove sample IDs std-101 .. std-120 from Firestore
-  for (let i = 101; i <= 120; i++) {
-    deleteStudentFromFirestore(`std-${i}`);
-  }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
   return [];
 }
 
@@ -241,6 +218,18 @@ export function saveAppsScriptUrl(url: string, syncToCloud = true): void {
   localStorage.setItem(GAS_URL_KEY, cleanUrl);
   if (syncToCloud) {
     syncSystemSettingsToFirestore('appsScriptUrl', cleanUrl);
+  }
+}
+
+export function getStoredStudentFormAccess(): boolean {
+  const val = localStorage.getItem(FORM_ACCESS_KEY);
+  return val === null ? true : val === 'true';
+}
+
+export function saveStudentFormAccess(isOpen: boolean, syncToCloud = true): void {
+  localStorage.setItem(FORM_ACCESS_KEY, String(isOpen));
+  if (syncToCloud) {
+    syncSystemSettingsToFirestore('studentFormAccess', isOpen);
   }
 }
 

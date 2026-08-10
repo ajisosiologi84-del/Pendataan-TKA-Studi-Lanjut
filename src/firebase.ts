@@ -25,29 +25,53 @@ export const laptopsCol = collection(db, 'laptops');
 export const securityLogsCol = collection(db, 'securityLogs');
 export const systemSettingsCol = collection(db, 'systemSettings');
 
+// Circuit breaker flag for quota exhaustion
+let isQuotaExceeded = false;
+
+function checkQuotaError(error: any): boolean {
+  if (!error) return false;
+  const msg = String(error.message || error);
+  const code = String(error.code || '');
+  if (code === 'resource-exhausted' || msg.includes('Quota exceeded') || msg.includes('resource-exhausted')) {
+    if (!isQuotaExceeded) {
+      isQuotaExceeded = true;
+      console.warn('[Firestore] Quota exceeded. Gracefully falling back to localStorage for seamless operation.');
+    }
+    return true;
+  }
+  return false;
+}
+
 /**
  * Firebase Synchronization Helpers
  */
 export async function syncStudentToFirestore(studentData: any) {
+  if (isQuotaExceeded) return;
   try {
-    if (!studentData.id) return;
+    if (!studentData || !studentData.id) return;
     const docRef = doc(db, 'students', String(studentData.id));
     await setDoc(docRef, { ...studentData, updatedAt: new Date().toISOString() }, { merge: true });
   } catch (error) {
-    console.warn('Firestore sync student error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore sync student error:', error);
+    }
   }
 }
 
 export async function deleteStudentFromFirestore(id: string) {
+  if (isQuotaExceeded) return;
   try {
     const docRef = doc(db, 'students', String(id));
     await deleteDoc(docRef);
   } catch (error) {
-    console.warn('Firestore delete student error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore delete student error:', error);
+    }
   }
 }
 
 export async function fetchStudentsFromFirestore() {
+  if (isQuotaExceeded) return null;
   try {
     const snapshot = await getDocs(studentsCol);
     const list: any[] = [];
@@ -56,41 +80,53 @@ export async function fetchStudentsFromFirestore() {
     });
     return list;
   } catch (error) {
-    console.warn('Firestore fetch students error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore fetch students error:', error);
+    }
     return null;
   }
 }
 
 export async function syncLaptopToFirestore(laptopData: any) {
+  if (isQuotaExceeded) return;
   try {
-    if (!laptopData.id) return;
+    if (!laptopData || !laptopData.id) return;
     const docRef = doc(db, 'laptops', String(laptopData.id));
     await setDoc(docRef, { ...laptopData, updatedAt: new Date().toISOString() }, { merge: true });
   } catch (error) {
-    console.warn('Firestore sync laptop error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore sync laptop error:', error);
+    }
   }
 }
 
 export async function syncSecurityLogToFirestore(logData: any) {
+  if (isQuotaExceeded) return;
   try {
-    if (!logData.id) return;
+    if (!logData || !logData.id) return;
     const docRef = doc(db, 'securityLogs', String(logData.id));
     await setDoc(docRef, logData, { merge: true });
   } catch (error) {
-    console.warn('Firestore sync security log error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore sync security log error:', error);
+    }
   }
 }
 
 export async function syncSystemSettingsToFirestore(key: string, data: any) {
+  if (isQuotaExceeded) return;
   try {
     const docRef = doc(db, 'systemSettings', key);
     await setDoc(docRef, { data, updatedAt: new Date().toISOString() }, { merge: true });
   } catch (error) {
-    console.warn('Firestore sync settings error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore sync settings error:', error);
+    }
   }
 }
 
 export async function fetchSystemSettingsFromFirestore(key: string) {
+  if (isQuotaExceeded) return null;
   try {
     const docRef = doc(db, 'systemSettings', key);
     const snap = await getDoc(docRef);
@@ -99,12 +135,15 @@ export async function fetchSystemSettingsFromFirestore(key: string) {
     }
     return null;
   } catch (error) {
-    console.warn('Firestore fetch settings error:', error);
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore fetch settings error:', error);
+    }
     return null;
   }
 }
 
 export function subscribeSystemSettingFromFirestore(key: string, callback: (data: any) => void) {
+  if (isQuotaExceeded) return () => {};
   const docRef = doc(db, 'systemSettings', key);
   return onSnapshot(
     docRef,
@@ -114,7 +153,9 @@ export function subscribeSystemSettingFromFirestore(key: string, callback: (data
       }
     },
     (error) => {
-      console.warn(`Firestore setting snapshot error (${key}):`, error);
+      if (!checkQuotaError(error)) {
+        console.warn(`Firestore setting snapshot error (${key}):`, error);
+      }
     }
   );
 }
@@ -123,13 +164,20 @@ export function subscribeSystemSettingFromFirestore(key: string, callback: (data
  * Realtime listener for students collection
  */
 export function subscribeStudentsFromFirestore(callback: (students: any[]) => void) {
-  return onSnapshot(studentsCol, (snapshot) => {
-    const list: any[] = [];
-    snapshot.forEach((d) => {
-      list.push(d.data());
-    });
-    callback(list);
-  }, (error) => {
-    console.warn('Firestore students snapshot error:', error);
-  });
+  if (isQuotaExceeded) return () => {};
+  return onSnapshot(
+    studentsCol,
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((d) => {
+        list.push(d.data());
+      });
+      callback(list);
+    },
+    (error) => {
+      if (!checkQuotaError(error)) {
+        console.warn('Firestore students snapshot error:', error);
+      }
+    }
+  );
 }

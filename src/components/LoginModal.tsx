@@ -129,7 +129,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
     const pass = studentPasswordInput.trim();
     if (!pass) {
-      setErrorMsg('Mohon masukkan Password (gunakan NIS Anda).');
+      setErrorMsg('Mohon masukkan Password Anda.');
       return;
     }
 
@@ -396,13 +396,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                   </span>
                 </div>
                 <p className="text-xs text-slate-600">
-                  Gunakan <strong>Nomor Induk Siswa (NIS)</strong> Anda sebagai Username dan Password untuk mengisi atau memperbarui data pilihan TKA dan Studi Lanjut.
+                  Gunakan Username dan Password dari ADMIN untuk mengisi atau memperbarui data pilihan TKA dan Studi Lanjut.
                 </p>
 
                 <div className="space-y-3 pt-1">
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-700">
-                      Nomor Induk Siswa (NIS) <span className="text-rose-500">*</span>
+                      Nomor Induk Siswa (NIS) / Username <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -413,7 +413,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                         value={nisInput}
                         onChange={(e) => setNisInput(e.target.value)}
                         disabled={lockoutTimer > 0}
-                        placeholder="Cth: 10234 atau 202601"
+                        placeholder="Masukkan NIS / Username"
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono disabled:bg-slate-100 disabled:cursor-not-allowed"
                         autoFocus
                       />
@@ -422,7 +422,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
 
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-700">
-                      Password (Gunakan NIS Anda) <span className="text-rose-500">*</span>
+                      Password <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -433,7 +433,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                         value={studentPasswordInput}
                         onChange={(e) => setStudentPasswordInput(e.target.value)}
                         disabled={lockoutTimer > 0}
-                        placeholder="Masukkan password (ketik NIS Anda)"
+                        placeholder="Masukkan Password"
                         className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                       />
                       <button
@@ -444,20 +444,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-500 italic">
-                      💡 Tip: Password standar adalah NIS Anda sendiri.
-                    </p>
                   </div>
                 </div>
-
-                {students.length > 0 && (
-                  <div className="mt-2 p-2.5 bg-white rounded-xl border border-emerald-100 text-[11px] text-slate-500">
-                    <span className="font-semibold text-emerald-800">Contoh NIS Siswa terdaftar:</span>{' '}
-                    <span className="font-mono text-slate-700">
-                      {students.slice(0, 4).map(s => s.nis).join(', ')}
-                    </span>
-                  </div>
-                )}
               </div>
 
               <button

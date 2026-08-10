@@ -28,7 +28,9 @@ import {
   saveSystemPasswords,
   saveCustomUsers,
   saveRolePermissions,
-  saveSecurityPolicy
+  saveSecurityPolicy,
+  getStoredStudentFormAccess,
+  saveStudentFormAccess,
 } from './utils/storage';
 import {
   subscribeStudentsFromFirestore,
@@ -65,6 +67,7 @@ export default function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [appsScriptUrl, setAppsScriptUrl] = useState('');
+  const [isStudentFormOpen, setIsStudentFormOpen] = useState<boolean>(() => getStoredStudentFormAccess());
   const [pendingBanPtSelection, setPendingBanPtSelection] = useState<{
     targetChoice: 'pilihan1' | 'pilihan2';
     ptn: string;
@@ -103,9 +106,11 @@ export default function App() {
         }
         const studentData = json.students || json.data;
         if (studentData && Array.isArray(studentData) && studentData.length > 0) {
-          saveStudents(studentData);
-          setStudents(studentData);
-          studentData.forEach((st) => syncStudentToFirestore(st));
+          const cleanStudents = studentData.filter(
+            (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
+          );
+          saveStudents(cleanStudents);
+          setStudents(cleanStudents);
         }
         return true;
       }
@@ -153,20 +158,20 @@ export default function App() {
       }
     });
 
+    // Real-time listener for Student Form Access Status (Open/Closed) across devices
+    const unsubscribeFormAccess = subscribeSystemSettingFromFirestore('studentFormAccess', (remoteAccess) => {
+      if (typeof remoteAccess === 'boolean') {
+        setIsStudentFormOpen(remoteAccess);
+        saveStudentFormAccess(remoteAccess, false);
+      }
+    });
+
     // Subscribe to Firestore students collection changes
     const unsubscribeStudents = subscribeStudentsFromFirestore((remoteStudents) => {
       if (remoteStudents && remoteStudents.length > 0) {
         const cleanRemote = remoteStudents.filter(
           (s: any) => s && s.id && !/^std-1[0-2][0-9]$/.test(s.id) && s.id !== 'std-101'
         );
-
-        // Delete any found sample dummy students from Firestore
-        remoteStudents.forEach((s: any) => {
-          if (s && s.id && (/^std-1[0-2][0-9]$/.test(s.id) || s.id === 'std-101')) {
-            deleteStudentFromFirestore(s.id);
-          }
-        });
-
         setStudents(cleanRemote);
         saveStudents(cleanRemote);
       } else {
@@ -580,6 +585,19 @@ export default function App() {
     setActiveTab('form');
   };
 
+  // Toggle Student Form Access (Open / Close)
+  const handleToggleStudentFormAccess = (isOpen: boolean) => {
+    setIsStudentFormOpen(isOpen);
+    saveStudentFormAccess(isOpen);
+    addSecurityLog({
+      role: userRole || 'superadmin',
+      action: 'TOGGLE_STUDENT_FORM_ACCESS',
+      category: 'SETTINGS',
+      status: 'SUCCESS',
+      details: `Admin ${isOpen ? 'MEMBUKA' : 'MENUTUP'} akses Formulir Pendataan Siswa`,
+    });
+  };
+
   // Refresh trigger
   const handleRefreshData = () => {
     const refreshed = getStoredStudents();
@@ -588,6 +606,7 @@ export default function App() {
     setProktorList(getStoredProktorTeknisi());
     setDocSettings(getStoredDocSettings());
     setAppsScriptUrl(getAppsScriptUrl());
+    setIsStudentFormOpen(getStoredStudentFormAccess());
   };
 
   return (
@@ -621,6 +640,7 @@ export default function App() {
         setIsMobileOpen={setIsMobileOpen}
         userRole={userRole}
         currentUserNis={currentUserNis}
+        isStudentFormOpen={isStudentFormOpen}
         onLogout={handleLogout}
       />
 
@@ -639,6 +659,7 @@ export default function App() {
           onRefreshData={handleRefreshData}
           isCompactMode={isCompactMode}
           setIsCompactMode={setIsCompactMode}
+          userRole={userRole}
         />
 
         {/* Dynamic View Content */}
@@ -676,6 +697,7 @@ export default function App() {
               }}
               onRefreshData={handleRefreshData}
               isReadOnly={userRole === 'walikelas' || userRole === 'bk'}
+              userRole={userRole}
             />
           )}
 
@@ -694,6 +716,8 @@ export default function App() {
               onOpenBanPtDirectory={() => setActiveTab('banpt')}
               prefilledBanPtSelection={pendingBanPtSelection}
               onClearPrefilledBanPt={() => setPendingBanPtSelection(null)}
+              userRole={userRole}
+              isStudentFormOpen={isStudentFormOpen}
             />
           )}
 
@@ -754,12 +778,15 @@ export default function App() {
               onResetLaptopsData={handleResetLaptops}
               totalStudents={students.length}
               totalLaptops={laptops.length}
+              isStudentFormOpen={isStudentFormOpen}
+              onToggleStudentFormAccess={handleToggleStudentFormAccess}
               onDataRestored={() => {
                 setStudents(getStoredStudents());
                 setLaptops(getStoredLaptops());
                 setProktorList(getStoredProktorTeknisi());
                 setDocSettings(getStoredDocSettings());
                 setAppsScriptUrl(getAppsScriptUrl());
+                setIsStudentFormOpen(getStoredStudentFormAccess());
               }}
             />
           )}
