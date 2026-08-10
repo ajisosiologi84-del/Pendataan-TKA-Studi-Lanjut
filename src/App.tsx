@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavigationTab, Student, LaptopData, ProktorTeknisi, DocumentSettings } from './types';
+import { NavigationTab, Student, LaptopData, ProktorTeknisi, DocumentSettings, UserRole } from './types';
 import {
   getStoredStudents,
   addStudent,
@@ -35,6 +35,7 @@ import {
 } from './utils/storage';
 import {
   subscribeStudentsFromFirestore,
+  subscribeLaptopsFromFirestore,
   syncStudentToFirestore,
   deleteStudentFromFirestore,
   fetchSystemSettingsFromFirestore,
@@ -56,8 +57,21 @@ import { StudentDetailModal } from './components/StudentDetailModal';
 import { LoginModal } from './components/LoginModal';
 
 export default function App() {
-  const [userRole, setUserRole] = useState<'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null>(null);
-  const [currentUserNis, setCurrentUserNis] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(() => {
+    try {
+      const saved = localStorage.getItem('tka_user_role_v1');
+      return (saved as UserRole) || null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [currentUserNis, setCurrentUserNis] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('tka_user_nis_v1') || null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
   const [students, setStudents] = useState<Student[]>([]);
   const [laptops, setLaptops] = useState<LaptopData[]>([]);
@@ -98,11 +112,11 @@ export default function App() {
 
       if (json && json.status === 'success') {
         if (json.laptops && Array.isArray(json.laptops) && json.laptops.length > 0) {
-          saveLaptops(json.laptops);
+          saveLaptops(json.laptops, false);
           setLaptops(json.laptops);
         }
         if (json.proktorList && Array.isArray(json.proktorList) && json.proktorList.length > 0) {
-          saveProktorTeknisi(json.proktorList);
+          saveProktorTeknisi(json.proktorList, false);
           setProktorList(json.proktorList);
         }
         const studentData = json.students || json.data;
@@ -122,7 +136,7 @@ export default function App() {
     }
   };
 
-  // Initial load & Firestore Realtime Sync & Auto Sync Google Sheets
+  // Initial load & Realtime Sync across ALL devices & Auto Sync Google Sheets
   useEffect(() => {
     const localList = getStoredStudents();
     setStudents(localList);
@@ -135,7 +149,7 @@ export default function App() {
       syncFromGoogleSheets(gasUrl);
     }
 
-    // Sync system settings (passwords, users, permissions, policy) from Firebase Firestore
+    // Initial fetch of system settings from Firebase Firestore
     fetchSystemSettingsFromFirestore('passwords').then((remotePass) => {
       if (remotePass) saveSystemPasswords(remotePass, false);
     });
@@ -149,7 +163,38 @@ export default function App() {
       if (remotePolicy) saveSecurityPolicy(remotePolicy, false);
     });
 
-    // Real-time listener for Google Apps Script Web App URL across ALL devices (Laptop, Tablet, Mobile)
+    // Realtime Subscriptions for ALL System Settings across all connected devices/browsers
+    const unsubPasswords = subscribeSystemSettingFromFirestore('passwords', (remotePass) => {
+      if (remotePass) saveSystemPasswords(remotePass, false);
+    });
+
+    const unsubCustomUsers = subscribeSystemSettingFromFirestore('customUsers', (remoteUsers) => {
+      if (remoteUsers) saveCustomUsers(remoteUsers, false);
+    });
+
+    const unsubRolePerms = subscribeSystemSettingFromFirestore('rolePermissions', (remoteMatrix) => {
+      if (remoteMatrix) saveRolePermissions(remoteMatrix, false);
+    });
+
+    const unsubSecPolicy = subscribeSystemSettingFromFirestore('securityPolicy', (remotePolicy) => {
+      if (remotePolicy) saveSecurityPolicy(remotePolicy, false);
+    });
+
+    const unsubProktor = subscribeSystemSettingFromFirestore('proktorList', (remoteProktor) => {
+      if (remoteProktor && Array.isArray(remoteProktor)) {
+        setProktorList(remoteProktor);
+        saveProktorTeknisi(remoteProktor, false);
+      }
+    });
+
+    const unsubDocSettings = subscribeSystemSettingFromFirestore('docSettings', (remoteDocSettings) => {
+      if (remoteDocSettings) {
+        setDocSettings(remoteDocSettings);
+        saveDocSettings(remoteDocSettings, false);
+      }
+    });
+
+    // Real-time listener for Google Apps Script Web App URL
     const unsubscribeGasUrl = subscribeSystemSettingFromFirestore('appsScriptUrl', (remoteGasUrl) => {
       if (typeof remoteGasUrl === 'string' && remoteGasUrl.trim()) {
         const cleanRemoteUrl = remoteGasUrl.trim();
@@ -159,7 +204,7 @@ export default function App() {
       }
     });
 
-    // Real-time listener for Student Form Access Status (Open/Closed) across devices
+    // Real-time listener for Student Form Access Status (Open/Closed)
     const unsubscribeFormAccess = subscribeSystemSettingFromFirestore('studentFormAccess', (remoteAccess) => {
       if (typeof remoteAccess === 'boolean') {
         setIsStudentFormOpen(remoteAccess);
@@ -167,7 +212,15 @@ export default function App() {
       }
     });
 
-    // Subscribe to Firestore students collection changes
+    // Real-time listener for Laptops collection
+    const unsubLaptops = subscribeLaptopsFromFirestore((remoteLaptops) => {
+      if (remoteLaptops && remoteLaptops.length > 0) {
+        setLaptops(remoteLaptops);
+        saveLaptops(remoteLaptops, false);
+      }
+    });
+
+    // Real-time listener for Students collection
     const unsubscribeStudents = subscribeStudentsFromFirestore((remoteStudents) => {
       if (remoteStudents && remoteStudents.length > 0) {
         const cleanRemote = remoteStudents.filter(
@@ -201,7 +254,15 @@ export default function App() {
     window.addEventListener('focus', handleFocus);
 
     return () => {
+      unsubPasswords();
+      unsubCustomUsers();
+      unsubRolePerms();
+      unsubSecPolicy();
+      unsubProktor();
+      unsubDocSettings();
+      unsubLaptops();
       unsubscribeGasUrl();
+      unsubscribeFormAccess();
       unsubscribeStudents();
       clearInterval(intervalId);
       window.removeEventListener('focus', handleFocus);
@@ -245,12 +306,18 @@ export default function App() {
     };
   }, [userRole, currentUserNis]);
 
-  const handleLogin = (role: 'superadmin' | 'walikelas' | 'bk' | 'siswa', nis?: string) => {
+  const handleLogin = (role: UserRole, nis?: string) => {
     setUserRole(role);
+    try {
+      localStorage.setItem('tka_user_role_v1', role);
+      if (nis) localStorage.setItem('tka_user_nis_v1', nis);
+      else localStorage.removeItem('tka_user_nis_v1');
+    } catch (_) {}
+
     if (role === 'siswa' && nis) {
       setCurrentUserNis(nis);
       const list = getStoredStudents();
-      const found = list.find((s) => s.nis === nis);
+      const found = list.find((s) => s.nis === nis || (s.nisn && s.nisn === nis));
       if (found) {
         setEditingStudent(found);
       } else {
@@ -289,6 +356,10 @@ export default function App() {
     setUserRole(null);
     setCurrentUserNis(null);
     setEditingStudent(null);
+    try {
+      localStorage.removeItem('tka_user_role_v1');
+      localStorage.removeItem('tka_user_nis_v1');
+    } catch (_) {}
     setActiveTab('dashboard');
   };
 

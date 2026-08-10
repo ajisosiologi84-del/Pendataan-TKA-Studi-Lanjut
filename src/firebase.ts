@@ -121,6 +121,52 @@ export async function syncLaptopToFirestore(laptopData: any) {
   }
 }
 
+export async function deleteLaptopFromFirestore(id: string) {
+  if (isQuotaExceeded) return;
+  try {
+    const docRef = doc(db, 'laptops', String(id));
+    await deleteDoc(docRef);
+  } catch (error) {
+    if (!checkQuotaError(error)) {
+      console.warn('Firestore delete laptop error:', error);
+    }
+  }
+}
+
+export function subscribeLaptopsFromFirestore(callback: (laptops: any[]) => void) {
+  if (isQuotaExceeded) return () => {};
+  let unsubber: (() => void) | null = null;
+  try {
+    unsubber = onSnapshot(
+      laptopsCol,
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((d) => {
+          list.push(d.data());
+        });
+        callback(list);
+      },
+      (error) => {
+        if (checkQuotaError(error)) {
+          if (unsubber) {
+            try { unsubber(); } catch (_) {}
+          }
+        } else {
+          console.warn('Firestore laptops snapshot error:', error);
+        }
+      }
+    );
+  } catch (err) {
+    checkQuotaError(err);
+  }
+
+  return () => {
+    if (unsubber) {
+      try { unsubber(); } catch (_) {}
+    }
+  };
+}
+
 export async function syncSecurityLogToFirestore(logData: any) {
   if (isQuotaExceeded) return;
   try {

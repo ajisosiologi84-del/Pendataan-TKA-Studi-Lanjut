@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu, Plus, Download, RefreshCw, Database, Minimize2, Maximize2 } from 'lucide-react';
-import { NavigationTab, Student } from '../types';
+import { NavigationTab, Student, UserRole } from '../types';
 import { exportStudentsToCSV } from '../utils/storage';
 
 interface HeaderProps {
@@ -11,7 +11,7 @@ interface HeaderProps {
   onRefreshData?: () => void;
   isCompactMode?: boolean;
   setIsCompactMode?: (compact: boolean) => void;
-  userRole?: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null;
+  userRole?: UserRole | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({

@@ -134,64 +134,85 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students }) => 
     }
 
     // Check if student exists in database
-    const matchedStudent = students.find((s) => s.nis === cleanNis);
+    const matchedStudent = students.find(
+      (s) => s.nis === cleanNis || (s.nisn && sanitizeNis(s.nisn) === cleanNis) || s.id === cleanNis
+    );
 
-    if (!matchedStudent) {
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
+    if (matchedStudent) {
+      const isPassValid =
+        pass === cleanNis ||
+        pass === 'siswa123' ||
+        pass === matchedStudent.nis ||
+        (matchedStudent.nisn && pass === matchedStudent.nisn);
+
+      if (!isPassValid) {
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+        addSecurityLog({
+          role: 'siswa',
+          userIdentifier: cleanNis,
+          action: 'STUDENT_LOGIN',
+          category: 'AUTH',
+          status: 'FAILED',
+          details: `Login siswa gagal: Password tidak cocok untuk NIS ${cleanNis}`,
+        });
+
+        if (newAttempts >= 5) {
+          setLockoutTimer(30);
+          setFailedAttempts(0);
+          setErrorMsg('Terlalu banyak percobaan login gagal! Akses terkunci selama 30 detik.');
+        } else {
+          setErrorMsg('Password salah! Password default siswa adalah NIS Anda atau "siswa123".');
+        }
+        return;
+      }
+
       addSecurityLog({
         role: 'siswa',
         userIdentifier: cleanNis,
         action: 'STUDENT_LOGIN',
         category: 'AUTH',
-        status: 'FAILED',
-        details: `Login siswa gagal: NIS ${cleanNis} tidak terdaftar di database`,
+        status: 'SUCCESS',
+        details: `Siswa ${matchedStudent.namaSiswa} (NIS: ${cleanNis}) berhasil login`,
       });
 
-      if (newAttempts >= 5) {
-        setLockoutTimer(30);
+      setFailedAttempts(0);
+      onLogin('siswa', cleanNis);
+    } else {
+      // New student login flow
+      if (cleanNis.length >= 3 && (pass === cleanNis || pass === 'siswa123')) {
+        addSecurityLog({
+          role: 'siswa',
+          userIdentifier: cleanNis,
+          action: 'STUDENT_LOGIN',
+          category: 'AUTH',
+          status: 'SUCCESS',
+          details: `Siswa baru dengan NIS ${cleanNis} berhasil masuk portal`,
+        });
+
         setFailedAttempts(0);
-        setErrorMsg('Terlalu banyak percobaan login gagal! Akses terkunci selama 30 detik.');
+        onLogin('siswa', cleanNis);
       } else {
-        setErrorMsg(`NIS "${cleanNis}" tidak ditemukan dalam database siswa!`);
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+        addSecurityLog({
+          role: 'siswa',
+          userIdentifier: cleanNis,
+          action: 'STUDENT_LOGIN',
+          category: 'AUTH',
+          status: 'FAILED',
+          details: `Login siswa gagal: NIS ${cleanNis} tidak terdaftar di database`,
+        });
+
+        if (newAttempts >= 5) {
+          setLockoutTimer(30);
+          setFailedAttempts(0);
+          setErrorMsg('Terlalu banyak percobaan login gagal! Akses terkunci selama 30 detik.');
+        } else {
+          setErrorMsg(`NIS "${cleanNis}" belum terdaftar! Gunakan password yang sama dengan NIS untuk mendaftar baru.`);
+        }
       }
-      return;
     }
-
-    // Password verification for student: password must equal NIS
-    if (pass !== cleanNis && pass !== 'siswa123') {
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
-      addSecurityLog({
-        role: 'siswa',
-        userIdentifier: cleanNis,
-        action: 'STUDENT_LOGIN',
-        category: 'AUTH',
-        status: 'FAILED',
-        details: `Login siswa gagal: Password tidak cocok untuk NIS ${cleanNis}`,
-      });
-
-      if (newAttempts >= 5) {
-        setLockoutTimer(30);
-        setFailedAttempts(0);
-        setErrorMsg('Terlalu banyak percobaan login gagal! Akses terkunci selama 30 detik.');
-      } else {
-        setErrorMsg('Password salah! Password siswa harus sama dengan Nomor Induk Siswa (NIS).');
-      }
-      return;
-    }
-
-    addSecurityLog({
-      role: 'siswa',
-      userIdentifier: cleanNis,
-      action: 'STUDENT_LOGIN',
-      category: 'AUTH',
-      status: 'SUCCESS',
-      details: `Siswa ${matchedStudent.namaSiswa} (NIS: ${cleanNis}) berhasil login`,
-    });
-
-    setFailedAttempts(0);
-    onLogin('siswa', cleanNis);
   };
 
   return (

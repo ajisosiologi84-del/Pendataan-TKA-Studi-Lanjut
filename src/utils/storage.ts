@@ -12,6 +12,7 @@ import {
   syncStudentToFirestore,
   deleteStudentFromFirestore,
   syncLaptopToFirestore,
+  deleteLaptopFromFirestore,
   syncSecurityLogToFirestore,
   syncSystemSettingsToFirestore
 } from '../firebase';
@@ -160,6 +161,7 @@ export function addMultipleStudents(
   }
 
   saveStudents(updatedList);
+  formatted.forEach((s) => syncStudentToFirestore(s));
   return updatedList;
 }
 
@@ -263,9 +265,12 @@ export function getStoredLaptops(): LaptopData[] {
   }
 }
 
-export function saveLaptops(laptops: LaptopData[]): void {
+export function saveLaptops(laptops: LaptopData[], syncRemote = true): void {
   try {
     localStorage.setItem(LAPTOPS_STORAGE_KEY, JSON.stringify(laptops));
+    if (syncRemote && Array.isArray(laptops)) {
+      laptops.forEach((lap) => syncLaptopToFirestore(lap));
+    }
   } catch (error) {
     console.error('Error saving laptops to localStorage:', error);
   }
@@ -279,7 +284,8 @@ export function addLaptop(data: Omit<LaptopData, 'id' | 'updatedAt'>): LaptopDat
     updatedAt: new Date().toISOString().split('T')[0],
   };
   const updatedList = [newLaptop, ...laptops];
-  saveLaptops(updatedList);
+  saveLaptops(updatedList, false);
+  syncLaptopToFirestore(newLaptop);
   return newLaptop;
 }
 
@@ -291,18 +297,23 @@ export function updateLaptop(updated: LaptopData): void {
       ...updated,
       updatedAt: new Date().toISOString().split('T')[0],
     };
-    saveLaptops(laptops);
+    saveLaptops(laptops, false);
+    syncLaptopToFirestore(laptops[index]);
   }
 }
 
 export function deleteLaptop(id: string): void {
   const laptops = getStoredLaptops();
   const filtered = laptops.filter((l) => l.id !== id);
-  saveLaptops(filtered);
+  saveLaptops(filtered, false);
+  deleteLaptopFromFirestore(id);
 }
 
 export function resetLaptopsData(): LaptopData[] {
   localStorage.setItem(LAPTOPS_STORAGE_KEY, JSON.stringify(INITIAL_LAPTOPS));
+  if (Array.isArray(INITIAL_LAPTOPS)) {
+    INITIAL_LAPTOPS.forEach((lap) => syncLaptopToFirestore(lap));
+  }
   return INITIAL_LAPTOPS;
 }
 
@@ -325,9 +336,12 @@ export function getStoredProktorTeknisi(): ProktorTeknisi[] {
   }
 }
 
-export function saveProktorTeknisi(data: ProktorTeknisi[]): void {
+export function saveProktorTeknisi(data: ProktorTeknisi[], syncRemote = true): void {
   try {
     localStorage.setItem(PROKTOR_STORAGE_KEY, JSON.stringify(data));
+    if (syncRemote) {
+      syncSystemSettingsToFirestore('proktorList', data);
+    }
   } catch (error) {
     console.error('Error saving proktor teknisi:', error);
   }
@@ -340,7 +354,7 @@ export function addProktorTeknisi(item: Omit<ProktorTeknisi, 'id'>): ProktorTekn
     id: 'pt-' + Date.now(),
   };
   const updated = [newItem, ...list];
-  saveProktorTeknisi(updated);
+  saveProktorTeknisi(updated, true);
   return newItem;
 }
 
@@ -349,14 +363,14 @@ export function updateProktorTeknisi(item: ProktorTeknisi): void {
   const index = list.findIndex((p) => p.id === item.id);
   if (index !== -1) {
     list[index] = item;
-    saveProktorTeknisi(list);
+    saveProktorTeknisi(list, true);
   }
 }
 
 export function deleteProktorTeknisi(id: string): void {
   const list = getStoredProktorTeknisi();
   const filtered = list.filter((p) => p.id !== id);
-  saveProktorTeknisi(filtered);
+  saveProktorTeknisi(filtered, true);
 }
 
 /* ==========================================================================
@@ -378,9 +392,12 @@ export function getStoredDocSettings(): DocumentSettings {
   }
 }
 
-export function saveDocSettings(settings: DocumentSettings): void {
+export function saveDocSettings(settings: DocumentSettings, syncRemote = true): void {
   try {
     localStorage.setItem(DOC_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    if (syncRemote) {
+      syncSystemSettingsToFirestore('docSettings', settings);
+    }
   } catch (error) {
     console.error('Error saving doc settings:', error);
   }

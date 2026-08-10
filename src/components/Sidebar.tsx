@@ -19,7 +19,7 @@ import {
   BookOpen,
   Calculator,
 } from 'lucide-react';
-import { NavigationTab } from '../types';
+import { NavigationTab, UserRole } from '../types';
 
 interface SidebarProps {
   activeTab: NavigationTab;
@@ -28,7 +28,7 @@ interface SidebarProps {
   appsScriptUrl: string;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
-  userRole: 'superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa' | null;
+  userRole: UserRole | null;
   currentUserNis?: string | null;
   isStudentFormOpen?: boolean;
   onLogout: () => void;
@@ -46,13 +46,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isStudentFormOpen = true,
   onLogout,
 }) => {
-  const allNavItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string | number; description: string; roles: ('superadmin' | 'walikelas' | 'bk' | 'proktor' | 'siswa')[] }[] = [
+  const allNavItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string | number; description: string; roles: UserRole[] }[] = [
     {
       id: 'dashboard',
       label: 'Dashboard Overview',
       icon: <LayoutDashboard className="w-5 h-5" />,
       description: 'Ringkasan data & statistik',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'students',
@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Users className="w-5 h-5" />,
       badge: totalStudents,
       description: 'Tabel & pencarian siswa',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'form',
@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Award className="w-5 h-5" />,
       badge: 'BAN-PT',
       description: 'Akreditasi Prodi Seluruh Indonesia',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
     },
     {
       id: 'mapelPilihan',
@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <BookOpen className="w-5 h-5" />,
       badge: 'SNBP',
       description: 'Matriks Mapel Pendukung Prodi PTN',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
     },
     {
       id: 'snbpCalc',
@@ -92,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Calculator className="w-5 h-5" />,
       badge: 'KALKULATOR',
       description: 'Hitung Rasionalisasi & Peluang Lolos SNBP',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
     },
     {
       id: 'laptop',
@@ -100,14 +100,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Laptop className="w-5 h-5" />,
       badge: 'PROKTOR',
       description: 'Inventaris Laptop, Lab & Suasana Ujian',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'analysis',
       label: 'Analisis Pilihan',
       icon: <BarChart3 className="w-5 h-5" />,
       description: 'Matriks Mapel & Studi Lanjut',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'appscript',
