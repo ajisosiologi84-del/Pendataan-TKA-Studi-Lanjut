@@ -104,6 +104,21 @@ export async function fetchSystemSettingsFromFirestore(key: string) {
   }
 }
 
+export function subscribeSystemSettingFromFirestore(key: string, callback: (data: any) => void) {
+  const docRef = doc(db, 'systemSettings', key);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (snap.exists() && snap.data()?.data !== undefined) {
+        callback(snap.data().data);
+      }
+    },
+    (error) => {
+      console.warn(`Firestore setting snapshot error (${key}):`, error);
+    }
+  );
+}
+
 /**
  * Realtime listener for students collection
  */

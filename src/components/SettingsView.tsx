@@ -464,6 +464,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setCopiedScript(false), 3000);
   };
 
+  const handleSaveGas = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSaveAppsScriptUrl(gasUrlInput);
+    addSecurityLog({
+      role: 'superadmin',
+      action: 'UPDATE_APPS_SCRIPT_URL',
+      category: 'SETTINGS',
+      status: 'SUCCESS',
+      details: `Memperbarui Google Apps Script Web App URL: ${gasUrlInput}`,
+    });
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
   // System Passwords & Advanced Security States
   const [passwordsForm, setPasswordsForm] = useState<SystemPasswords>(() => getStoredSystemPasswords());
   const [showPass, setShowPass] = useState({ superadmin: false, walikelas: false, bk: false, proktor: false, teknisi: false });
@@ -732,20 +746,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       category: 'SETTINGS',
       status: 'SUCCESS',
       details: 'Memperbarui Pengaturan Kop Surat & Dokumen PDF',
-    });
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
-
-  const handleSaveGas = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSaveAppsScriptUrl(gasUrlInput);
-    addSecurityLog({
-      role: 'superadmin',
-      action: 'UPDATE_APPS_SCRIPT_URL',
-      category: 'SETTINGS',
-      status: 'SUCCESS',
-      details: 'Memperbarui URL Google Apps Script Web App',
     });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);

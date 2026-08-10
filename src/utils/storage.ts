@@ -197,8 +197,12 @@ export function getAppsScriptUrl(): string {
   return localStorage.getItem(GAS_URL_KEY) || '';
 }
 
-export function saveAppsScriptUrl(url: string): void {
-  localStorage.setItem(GAS_URL_KEY, url.trim());
+export function saveAppsScriptUrl(url: string, syncToCloud = true): void {
+  const cleanUrl = url.trim();
+  localStorage.setItem(GAS_URL_KEY, cleanUrl);
+  if (syncToCloud) {
+    syncSystemSettingsToFirestore('appsScriptUrl', cleanUrl);
+  }
 }
 
 /* ==========================================================================

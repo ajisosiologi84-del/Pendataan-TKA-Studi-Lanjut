@@ -30,7 +30,12 @@ import {
   saveRolePermissions,
   saveSecurityPolicy
 } from './utils/storage';
-import { subscribeStudentsFromFirestore, syncStudentToFirestore, fetchSystemSettingsFromFirestore } from './firebase';
+import {
+  subscribeStudentsFromFirestore,
+  syncStudentToFirestore,
+  fetchSystemSettingsFromFirestore,
+  subscribeSystemSettingFromFirestore
+} from './firebase';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -71,8 +76,21 @@ export default function App() {
     if (!url) return false;
 
     try {
-      const res = await fetch(url.trim(), { method: 'GET' });
-      const json = await res.json();
+      let json: any = null;
+      try {
+        // Try POST with action 'getAll' first (most compatible across browser CORS modes)
+        const postRes = await fetch(url.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'getAll' }),
+        });
+        json = await postRes.json();
+      } catch (postErr) {
+        // Fallback to GET request
+        const getRes = await fetch(url.trim(), { method: 'GET' });
+        json = await getRes.json();
+      }
+
       if (json && json.status === 'success') {
         if (json.laptops && Array.isArray(json.laptops) && json.laptops.length > 0) {
           saveLaptops(json.laptops);
@@ -82,9 +100,11 @@ export default function App() {
           saveProktorTeknisi(json.proktorList);
           setProktorList(json.proktorList);
         }
-        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-          saveStudents(json.data);
-          setStudents(json.data);
+        const studentData = json.students || json.data;
+        if (studentData && Array.isArray(studentData) && studentData.length > 0) {
+          saveStudents(studentData);
+          setStudents(studentData);
+          studentData.forEach((st) => syncStudentToFirestore(st));
         }
         return true;
       }
@@ -122,8 +142,18 @@ export default function App() {
       if (remotePolicy) saveSecurityPolicy(remotePolicy, false);
     });
 
-    // Subscribe to Firestore changes
-    const unsubscribe = subscribeStudentsFromFirestore((remoteStudents) => {
+    // Real-time listener for Google Apps Script Web App URL across ALL devices (Laptop, Tablet, Mobile)
+    const unsubscribeGasUrl = subscribeSystemSettingFromFirestore('appsScriptUrl', (remoteGasUrl) => {
+      if (typeof remoteGasUrl === 'string' && remoteGasUrl.trim()) {
+        const cleanRemoteUrl = remoteGasUrl.trim();
+        setAppsScriptUrl(cleanRemoteUrl);
+        saveAppsScriptUrl(cleanRemoteUrl, false);
+        syncFromGoogleSheets(cleanRemoteUrl);
+      }
+    });
+
+    // Subscribe to Firestore students collection changes
+    const unsubscribeStudents = subscribeStudentsFromFirestore((remoteStudents) => {
       if (remoteStudents && remoteStudents.length > 0) {
         setStudents(remoteStudents);
         saveStudents(remoteStudents);
@@ -133,13 +163,13 @@ export default function App() {
       }
     });
 
-    // Auto sync with Google Sheets periodically (every 45 seconds) & on window focus
-    let intervalId: any = null;
-    if (gasUrl) {
-      intervalId = setInterval(() => {
-        syncFromGoogleSheets(gasUrl);
-      }, 45000);
-    }
+    // Auto sync with Google Sheets periodically (every 30 seconds) & on window focus
+    const intervalId = setInterval(() => {
+      const currentUrl = getAppsScriptUrl();
+      if (currentUrl) {
+        syncFromGoogleSheets(currentUrl);
+      }
+    }, 30000);
 
     const handleFocus = () => {
       const currentGasUrl = getAppsScriptUrl();
@@ -150,8 +180,9 @@ export default function App() {
     window.addEventListener('focus', handleFocus);
 
     return () => {
-      unsubscribe();
-      if (intervalId) clearInterval(intervalId);
+      unsubscribeGasUrl();
+      unsubscribeStudents();
+      clearInterval(intervalId);
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
