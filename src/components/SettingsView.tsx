@@ -38,7 +38,13 @@ import {
   Clock,
   Smartphone,
   Shield,
-  UserCheck
+  UserCheck,
+  Copy,
+  ExternalLink,
+  FileCode,
+  Terminal,
+  CloudDownload,
+  CloudUpload
 } from 'lucide-react';
 import {
   DocumentSettings,
@@ -67,8 +73,216 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   DEFAULT_SECURITY_POLICY,
   SecurityLog,
-  SystemPasswords
+  SystemPasswords,
+  getStoredStudents,
+  saveStudents
 } from '../utils/storage';
+
+export const GOOGLE_APPS_SCRIPT_CODE = `/**
+ * ============================================================================
+ * KODE GOOGLE APPS SCRIPT (Code.gs) - REVISI TERBARU 2026
+ * Portal Pendataan Siswa TKA & Studi Lanjut Lulusan
+ * ============================================================================
+ * 
+ * PETUNJUK PEMASANGAN LENGKAP:
+ * 1. Buka Google Sheets Anda di https://sheets.google.com (atau buat Spreadsheet baru)
+ * 2. Klik menu 'Ekstensi' (Extensions) -> pilih 'Apps Script'.
+ * 3. Hapus seluruh kode default yang ada di editor, lalu Paste (Tempel) KODE INI.
+ * 4. Klik tombol 'Terapkan' (Deploy) di sudut kanan atas -> pilih 'Terapkan sebagai aplikasi web' (New deployment).
+ * 5. Pengaturan Deployment:
+ *    - Jenis (Select type): Aplikasi web (Web App)
+ *    - Deskripsi: Sync Portal TKA v2
+ *    - Jalankan sebagai (Execute as): Saya (Me / email anda)
+ *    - Yang memiliki akses (Who has access): Siapa saja (Anyone) -> SANGAT PENTING agar dapat diakses dari Web Portal
+ * 6. Klik 'Terapkan' (Deploy), lalu setujui (Allow) Otorisasi Akses Google.
+ * 7. Salin (Copy) URL Aplikasi Web (Web App URL) yang dihasilkan (berformat https://script.google.com/macros/s/.../exec).
+ * 8. Tempelkan URL tersebut ke kolom "Google Apps Script Web App URL" di Portal ini, lalu klik Simpan URL.
+ */
+
+const SHEET_NAME = "Data_Siswa_TKA";
+
+function setupSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+  }
+  
+  const headers = [
+    "ID", "Nama Siswa", "NIS", "NISN", "Kelas", "Jenis Kelamin",
+    "Mapel TKA 1", "Mapel TKA 2", "Pilihan Studi Lanjut",
+    "PTN Pilihan 1", "Prodi Pilihan 1", "Akreditasi 1", "Kriteria 1",
+    "PTN Pilihan 2", "Prodi Pilihan 2", "Akreditasi 2", "Kriteria 2",
+    "KIP Kuliah", "Desil", "No HP", "Catatan", "Terakhir Diperbarui"
+  ];
+  
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setBackground("#1e1b4b");
+    headerRange.setFontColor("#ffffff");
+    headerRange.setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function doGet(e) {
+  try {
+    const sheet = setupSheet();
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return createJsonResponse({ status: "success", count: 0, students: [] });
+    }
+    
+    const students = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[1] && !row[2]) continue;
+      
+      students.push({
+        id: String(row[0] || ('std-' + Date.now() + '-' + i)),
+        namaSiswa: String(row[1] || ''),
+        nis: String(row[2] || ''),
+        nisn: String(row[3] || ''),
+        kelas: String(row[4] || 'XII Merdeka 1'),
+        jenisKelamin: String(row[5] || 'L').toUpperCase().startsWith('P') ? 'P' : 'L',
+        mapelTka1: String(row[6] || 'Matematika'),
+        mapelTka2: String(row[7] || 'Fisika'),
+        pilihanStudiLanjut: String(row[8] || 'Kuliah'),
+        ptn1: String(row[9] || ''),
+        prodiPilihan1: String(row[10] || ''),
+        akreditasiPilihan1: String(row[11] || ''),
+        kriteriaPilihan1: String(row[12] || ''),
+        ptn2: String(row[13] || ''),
+        prodiPilihan2: String(row[14] || ''),
+        akreditasiPilihan2: String(row[15] || ''),
+        kriteriaPilihan2: String(row[16] || ''),
+        mengajukanKipKuliah: String(row[17] || 'Tidak'),
+        kategoriDesil: String(row[18] || ''),
+        noHp: String(row[19] || ''),
+        catatan: String(row[20] || ''),
+        updatedAt: String(row[21] || new Date().toISOString().split('T')[0])
+      });
+    }
+    
+    return createJsonResponse({ status: "success", count: students.length, students: students });
+  } catch (err) {
+    return createJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function doPost(e) {
+  try {
+    const sheet = setupSheet();
+    let contents = {};
+    if (e && e.postData && e.postData.contents) {
+      contents = JSON.parse(e.postData.contents);
+    }
+    
+    const action = contents.action || "save";
+    
+    if (action === "ping" || action === "test") {
+      return createJsonResponse({
+        status: "success",
+        message: "Koneksi Google Sheets Apps Script Berhasil Terhubung!",
+        spreadsheetName: SpreadsheetApp.getActiveSpreadsheet().getName(),
+        time: new Date().toISOString()
+      });
+    }
+    
+    if (action === "getAll") {
+      return doGet(e);
+    }
+    
+    if (action === "batchSave" && Array.isArray(contents.students)) {
+      let savedCount = 0;
+      contents.students.forEach(st => {
+        saveOrUpdateStudentRow(sheet, st);
+        savedCount++;
+      });
+      return createJsonResponse({ status: "success", message: "Berhasil mengimpor " + savedCount + " siswa ke Google Sheets", count: savedCount });
+    }
+    
+    if (action === "save" && contents.student) {
+      saveOrUpdateStudentRow(sheet, contents.student);
+      return createJsonResponse({ status: "success", message: "Data siswa berhasil disimpan ke Google Sheets" });
+    }
+    
+    if (action === "delete" && (contents.nis || contents.id)) {
+      const data = sheet.getDataRange().getValues();
+      const targetNis = String(contents.nis || '');
+      const targetId = String(contents.id || '');
+      
+      for (let i = 1; i < data.length; i++) {
+        if ((targetNis && String(data[i][2]) === targetNis) || (targetId && String(data[i][0]) === targetId)) {
+          sheet.deleteRow(i + 1);
+          return createJsonResponse({ status: "success", message: "Baris data berhasil dihapus" });
+        }
+      }
+    }
+    
+    return createJsonResponse({ status: "success", message: "Aksi selesai di Google Sheets" });
+  } catch (err) {
+    return createJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function saveOrUpdateStudentRow(sheet, st) {
+  const data = sheet.getDataRange().getValues();
+  const stNis = String(st.nis || '');
+  const stNisn = String(st.nisn || '');
+  let foundRowIndex = -1;
+  
+  if (stNis || stNisn) {
+    for (let i = 1; i < data.length; i++) {
+      const rowNis = String(data[i][2] || '');
+      const rowNisn = String(data[i][3] || '');
+      if ((stNis && rowNis === stNis) || (stNisn && rowNisn === stNisn)) {
+        foundRowIndex = i + 1;
+        break;
+      }
+    }
+  }
+  
+  const rowValues = [
+    st.id || ('std-' + Date.now()),
+    st.namaSiswa || '',
+    st.nis || '',
+    st.nisn || '',
+    st.kelas || 'XII Merdeka 1',
+    st.jenisKelamin || 'L',
+    st.mapelTka1 || '',
+    st.mapelTka2 || '',
+    st.pilihanStudiLanjut || 'Kuliah',
+    st.ptn1 || '',
+    st.prodiPilihan1 || '',
+    st.akreditasiPilihan1 || '',
+    st.kriteriaPilihan1 || '',
+    st.ptn2 || '',
+    st.prodiPilihan2 || '',
+    st.akreditasiPilihan2 || '',
+    st.kriteriaPilihan2 || '',
+    st.mengajukanKipKuliah || 'Tidak',
+    st.kategoriDesil || '',
+    st.noHp || '',
+    st.catatan || '',
+    st.updatedAt || new Date().toISOString().split('T')[0]
+  ];
+  
+  if (foundRowIndex > 0) {
+    sheet.getRange(foundRowIndex, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+}
+
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+`;
 
 interface SettingsViewProps {
   docSettings: DocumentSettings;
@@ -112,6 +326,143 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwordSaveSuccess, setPasswordSaveSuccess] = useState(false);
+
+  // Google Apps Script Testing & Syncing states
+  const [isTestingGas, setIsTestingGas] = useState(false);
+  const [gasTestResult, setGasTestResult] = useState<{
+    success: boolean;
+    message: string;
+    sheetName?: string;
+  } | null>(null);
+  const [isSyncingGas, setIsSyncingGas] = useState(false);
+  const [gasSyncResult, setGasSyncResult] = useState<string | null>(null);
+  const [copiedScript, setCopiedScript] = useState(false);
+
+  const handleTestGasConnection = async () => {
+    const url = gasUrlInput.trim() || appsScriptUrl;
+    if (!url) {
+      setGasTestResult({
+        success: false,
+        message: '⚠️ Silakan masukkan URL Google Apps Script Web App terlebih dahulu.',
+      });
+      return;
+    }
+
+    setIsTestingGas(true);
+    setGasTestResult(null);
+
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'ping' }),
+      });
+      const data = await resp.json();
+      if (data.status === 'success') {
+        setGasTestResult({
+          success: true,
+          message: data.message || 'Berhasil terhubung dengan Google Sheets!',
+          sheetName: data.spreadsheetName,
+        });
+      } else {
+        setGasTestResult({
+          success: false,
+          message: data.message || 'Respon diterima tetapi terdapat kesalahan.',
+        });
+      }
+    } catch (err: any) {
+      setGasTestResult({
+        success: false,
+        message:
+          'Gagal terhubung ke Apps Script: ' +
+          (err.message || 'Pastikan URL benar dan Akses (Who has access) diatur ke "Anyone / Siapa saja".'),
+      });
+    } finally {
+      setIsTestingGas(false);
+    }
+  };
+
+  const handlePullFromGas = async () => {
+    const url = gasUrlInput.trim() || appsScriptUrl;
+    if (!url) {
+      alert('URL Google Apps Script belum terkonfigurasi.');
+      return;
+    }
+
+    if (!window.confirm('Tarik data dari Google Sheets dan sinkronkan ke portal ini?')) return;
+
+    setIsSyncingGas(true);
+    setGasSyncResult('Mengambil data dari Google Sheets...');
+
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'getAll' }),
+      });
+      const data = await resp.json();
+      if (data.status === 'success' && Array.isArray(data.students)) {
+        if (data.students.length === 0) {
+          setGasSyncResult('Selesai! Google Sheets masih kosong (0 siswa).');
+        } else {
+          saveStudents(data.students);
+          if (onDataRestored) onDataRestored();
+          setGasSyncResult(`✓ Berhasil menarik ${data.students.length} data siswa dari Google Sheets!`);
+        }
+      } else {
+        setGasSyncResult('Gagal menarik data: ' + (data.message || 'Respon tidak valid'));
+      }
+    } catch (err: any) {
+      setGasSyncResult('Gagal terhubung: ' + err.message);
+    } finally {
+      setIsSyncingGas(false);
+      setTimeout(() => setGasSyncResult(null), 6000);
+    }
+  };
+
+  const handlePushToGas = async () => {
+    const url = gasUrlInput.trim() || appsScriptUrl;
+    if (!url) {
+      alert('URL Google Apps Script belum terkonfigurasi.');
+      return;
+    }
+
+    const currentStudents = getStoredStudents();
+    if (currentStudents.length === 0) {
+      alert('Tidak ada data siswa lokal untuk dikirim ke Google Sheets.');
+      return;
+    }
+
+    if (!window.confirm(`Kirim ${currentStudents.length} data siswa lokal ke Google Sheets?`)) return;
+
+    setIsSyncingGas(true);
+    setGasSyncResult(`Mengirim ${currentStudents.length} data siswa ke Google Sheets...`);
+
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'batchSave', students: currentStudents }),
+      });
+      const data = await resp.json();
+      if (data.status === 'success') {
+        setGasSyncResult(`✓ Berhasil mengirim ${currentStudents.length} siswa ke Google Sheets!`);
+      } else {
+        setGasSyncResult('Gagal mengirim data: ' + (data.message || 'Error'));
+      }
+    } catch (err: any) {
+      setGasSyncResult('Gagal mengirim data: ' + err.message);
+    } finally {
+      setIsSyncingGas(false);
+      setTimeout(() => setGasSyncResult(null), 6000);
+    }
+  };
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 3000);
+  };
 
   // System Passwords & Advanced Security States
   const [passwordsForm, setPasswordsForm] = useState<SystemPasswords>(() => getStoredSystemPasswords());
@@ -1131,63 +1482,208 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* SECTION 3: GOOGLE APPS SCRIPT */}
       {activeSubTab === 'appscript' && (
-        <form onSubmit={handleSaveGas} className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200/80 space-y-6">
-          <div className="border-b border-slate-200 pb-4">
-            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Code2 className="w-5 h-5 text-indigo-600" /> Integrasi Google Apps Script & Cloud Sheets
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Hubungkan portal dengan Google Spreadsheet menggunakan Web App URL untuk sinkronisasi data siswa secara real-time.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-slate-700 uppercase">Google Apps Script Web App URL</label>
-            <input
-              type="url"
-              value={gasUrlInput}
-              onChange={(e) => setGasUrlInput(e.target.value)}
-              placeholder="https://script.google.com/macros/s/.../exec"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-slate-500 leading-relaxed">
-              💡 Masukkan URL deployment web app Google Apps Script Anda. Jika dikosongkan, aplikasi berjalan menggunakan penyimpanan lokal browser (localStorage).
-            </p>
-          </div>
-
-          <div className="bg-indigo-50/60 border border-indigo-200 rounded-2xl p-4 space-y-2 text-xs text-indigo-950">
-            <div className="font-bold flex items-center gap-1.5 text-indigo-900">
-              <ShieldCheck className="w-4 h-4 text-indigo-600" /> Status Koneksi Integrasi:
+        <div className="space-y-6">
+          <form onSubmit={handleSaveGas} className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200/80 space-y-6">
+            <div className="border-b border-slate-200 pb-4">
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Code2 className="w-5 h-5 text-indigo-600" /> Integrasi Google Apps Script & Cloud Sheets
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Hubungkan portal dengan Google Spreadsheet menggunakan Web App URL untuk sinkronisasi data siswa secara real-time.
+              </p>
             </div>
-            <p className="text-indigo-900">
-              {appsScriptUrl ? (
-                <span className="text-emerald-700 font-bold flex items-center gap-1">
-                  ✓ Web App URL terkonfigurasi dan aktif ({appsScriptUrl.substring(0, 40)}...)
-                </span>
-              ) : (
-                <span className="text-amber-700 font-bold">
-                  ⚠️ Belum dikonfigurasi (Menggunakan mode penyimpanan lokal browser).
-                </span>
-              )}
-            </p>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-700 uppercase">Google Apps Script Web App URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={gasUrlInput}
+                  onChange={(e) => setGasUrlInput(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleTestGasConnection}
+                  disabled={isTestingGas}
+                  className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0"
+                >
+                  {isTestingGas ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Uji Koneksi
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                💡 Masukkan URL deployment web app Google Apps Script Anda. Pastikan opsi 'Who has access' diatur ke 'Anyone' agar webhook dapat diakses.
+              </p>
+            </div>
+
+            {/* Test Result Alert */}
+            {gasTestResult && (
+              <div
+                className={`p-4 rounded-xl border text-xs font-medium space-y-1 ${
+                  gasTestResult.success
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}
+              >
+                <div className="font-bold flex items-center gap-2">
+                  {gasTestResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  )}
+                  {gasTestResult.message}
+                </div>
+                {gasTestResult.sheetName && (
+                  <p className="text-[11px] opacity-80">
+                    Terhubung ke Spreadsheet Google: <strong>{gasTestResult.sheetName}</strong>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Connection Status Badge */}
+            <div className="bg-indigo-50/60 border border-indigo-200 rounded-2xl p-4 space-y-2 text-xs text-indigo-950">
+              <div className="font-bold flex items-center gap-1.5 text-indigo-900">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" /> Status Koneksi Integrasi:
+              </div>
+              <p className="text-indigo-900">
+                {appsScriptUrl ? (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    ✓ Web App URL terkonfigurasi dan aktif ({appsScriptUrl.substring(0, 45)}...)
+                  </span>
+                ) : (
+                  <span className="text-amber-700 font-bold">
+                    ⚠️ Belum dikonfigurasi (Menggunakan mode penyimpanan lokal browser).
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Cloud Sync Action Bar */}
+            {(appsScriptUrl || gasUrlInput) && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-2">
+                    <Database className="w-4 h-4 text-indigo-600" /> Aksi Manual Sinkronisasi Cloud Sheets
+                  </h3>
+                  {gasSyncResult && (
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                      {gasSyncResult}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePullFromGas}
+                    disabled={isSyncingGas}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50"
+                  >
+                    {isSyncingGas ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
+                    Tarik Data dari Google Sheets
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePushToGas}
+                    disabled={isSyncingGas}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50"
+                  >
+                    {isSyncingGas ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
+                    Kirim Semua Data ke Google Sheets
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setGasUrlInput('');
+                  onSaveAppsScriptUrl('');
+                  setGasTestResult(null);
+                }}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+              >
+                Hapus / Putuskan
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-indigo-600/25 transition-all"
+              >
+                <Save className="w-4 h-4" /> Simpan URL Apps Script
+              </button>
+            </div>
+          </form>
+
+          {/* CODE GS SOURCE BOX */}
+          <div className="bg-slate-900 text-slate-100 rounded-2xl p-6 shadow-lg border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <FileCode className="w-5 h-5 text-indigo-400" /> Kode Script Google Apps Script (Code.gs) Terbaru
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Salin kode di bawah ini dan tempelkan ke editor Apps Script pada Google Spreadsheet Anda.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyScript}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 self-start sm:self-auto shadow-md"
+              >
+                {copiedScript ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-300" /> Kode Tersalin!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" /> Salin Seluruh Kode Script
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="relative rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-[11px] leading-relaxed text-slate-300 max-h-96 overflow-y-auto">
+              <pre>{GOOGLE_APPS_SCRIPT_CODE}</pre>
+            </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={() => setGasUrlInput('')}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
-            >
-              Hapus / Putuskan
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-indigo-600/25 transition-all"
-            >
-              <Save className="w-4 h-4" /> Simpan URL Apps Script
-            </button>
+          {/* STEP BY STEP TUTORIAL */}
+          <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200/80 space-y-4">
+            <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+              <Terminal className="w-5 h-5 text-indigo-600" /> Panduan Langkah Pemasangan Google Apps Script
+            </h3>
+            <div className="grid sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold text-slate-900">1. Buka Google Sheets</div>
+                <p className="text-slate-600">
+                  Buat atau buka Google Spreadsheet baru Anda di Google Drive.
+                </p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold text-slate-900">2. Masuk ke Apps Script</div>
+                <p className="text-slate-600">
+                  Klik menu <strong>Ekstensi (Extensions)</strong> &gt; pilih <strong>Apps Script</strong>.
+                </p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold text-slate-900">3. Tempel Kode Code.gs</div>
+                <p className="text-slate-600">
+                  Hapus semua isi editor, klik tombol <strong>"Salin Seluruh Kode Script"</strong> di atas, lalu tempel (Paste).
+                </p>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-1 text-amber-900">
+                <div className="font-bold text-amber-950">4. Terapkan (Deploy) Web App</div>
+                <p className="text-amber-900">
+                  Klik <strong>Deploy &gt; New deployment &gt; Web app</strong>. Pastikan <em>Who has access</em> diatur ke <strong>Anyone (Siapa saja)</strong>!
+                </p>
+              </div>
+            </div>
           </div>
-        </form>
+        </div>
       )}
 
       {/* SECTION 4: MANAJEMEN DATA & RESET */}

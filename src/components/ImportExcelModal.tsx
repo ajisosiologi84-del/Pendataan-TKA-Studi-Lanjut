@@ -84,16 +84,11 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
       const gasUrl = getAppsScriptUrl();
       if (gasUrl) {
         try {
-          // Sync each or batch silently
-          await Promise.all(
-            parsedData.slice(0, 20).map((st) =>
-              fetch(gasUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'save', target: 'student', student: st }),
-              })
-            )
-          );
+          await fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'batchSave', students: parsedData }),
+          });
         } catch (gasErr) {
           console.warn('Apps script sync warning:', gasErr);
         }
