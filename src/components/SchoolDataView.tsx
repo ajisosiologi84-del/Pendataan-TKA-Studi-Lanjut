@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Building2,
   Plus,
@@ -166,6 +167,91 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      { 'Nama Siswa': 'Ahmad Fauzi', 'NIS': '22231001', 'NISN': '0061234561', 'Kelas': 'XII Merdeka 1' },
+      { 'Nama Siswa': 'Anisa Rahmawati', 'NIS': '22231002', 'NISN': '0061234562', 'Kelas': 'XII Merdeka 1' },
+      { 'Nama Siswa': 'Bintang Putra Pratama', 'NIS': '22231003', 'NISN': '0061234563', 'Kelas': 'XII Merdeka 2' },
+      { 'Nama Siswa': 'Citra Dewi Kartika', 'NIS': '22231004', 'NISN': '0061234564', 'Kelas': 'XII Merdeka 2' },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    // Auto column widths
+    worksheet['!cols'] = [
+      { wch: 30 }, // Nama Siswa
+      { wch: 15 }, // NIS
+      { wch: 18 }, // NISN
+      { wch: 20 }, // Kelas
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Input Data Sekolah');
+    XLSX.writeFile(workbook, 'Template_Input_Data_Sekolah.xlsx');
+  };
+
+  const handleLoadSampleTemplateText = () => {
+    const sampleText = `Nama Siswa\tNIS\tNISN\tKelas
+Ahmad Fauzi\t22231001\t0061234561\tXII Merdeka 1
+Anisa Rahmawati\t22231002\t0061234562\tXII Merdeka 1
+Bintang Putra Pratama\t22231003\t0061234563\tXII Merdeka 2
+Citra Dewi Kartika\t22231004\t0061234564\tXII Merdeka 2`;
+    setRawImportText(sampleText);
+    setImportStatus('✓ Contoh data template Excel berhasil dimuat! Klik "Pratinjau Data" untuk memeriksa.');
+  };
+
+  // Upload Excel file handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json<any>(ws);
+
+        const parsed: Array<{ namaSiswa: string; nis: string; nisn: string; kelas: string }> = [];
+        data.forEach((row: any) => {
+          const keys = Object.keys(row);
+          const findKey = (term: string) => keys.find((k) => k.toLowerCase().includes(term));
+
+          const namaKey = findKey('nama') || keys[0];
+          const nisKey = keys.find((k) => k.toLowerCase().includes('nis') && !k.toLowerCase().includes('nisn')) || keys[1];
+          const nisnKey = findKey('nisn') || keys[2];
+          const kelasKey = findKey('kelas') || keys[3];
+
+          const rawNama = String(row[namaKey] || '').trim();
+          const rawNis = String(row[nisKey || ''] || '').trim();
+          const rawNisn = String(row[nisnKey || ''] || '').trim();
+          const rawKelas = String(row[kelasKey || ''] || 'XII Merdeka 1').trim();
+
+          if (rawNama) {
+            parsed.push({
+              namaSiswa: rawNama,
+              nis: rawNis,
+              nisn: rawNisn,
+              kelas: rawKelas || 'XII Merdeka 1',
+            });
+          }
+        });
+
+        setImportPreview(parsed);
+        if (parsed.length > 0) {
+          setImportStatus(`✓ Berhasil membaca file Excel "${file.name}" (${parsed.length} baris data siswa).`);
+        } else {
+          setImportStatus('❌ File Excel dibaca tetapi tidak ditemukan baris data siswa yang sesuai.');
+        }
+      } catch (err) {
+        console.error('File Excel error:', err);
+        setImportStatus('❌ Gagal membaca file Excel. Pastikan format file .xlsx atau .xls valid.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   // Parse Excel / CSV pasted text
   const handleParseImportText = () => {
     if (!rawImportText.trim()) {
@@ -240,27 +326,29 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
     alert(`Berhasil mengimpor ${newItems.length} data siswa sekolah baru!`);
   };
 
-  const handleExportCsv = () => {
+  const handleExportExcel = () => {
     if (masterStudents.length === 0) {
       alert('Tidak ada data untuk diexport.');
       return;
     }
-    const headers = ['Nama Siswa', 'NIS', 'NISN', 'Kelas'];
-    const rows = masterStudents.map((s) => [
-      `"${s.namaSiswa.replace(/"/g, '""')}"`,
-      `"${s.nis}"`,
-      `"${s.nisn}"`,
-      `"${s.kelas}"`,
-    ]);
+    const exportData = masterStudents.map((s) => ({
+      'Nama Siswa': s.namaSiswa,
+      'NIS': s.nis,
+      'NISN': s.nisn,
+      'Kelas': s.kelas,
+    }));
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Master_Data_Sekolah_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    worksheet['!cols'] = [
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 20 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Master Data Sekolah');
+    XLSX.writeFile(workbook, `Master_Data_Sekolah_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
@@ -290,6 +378,13 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={handleDownloadTemplate}
+                className="inline-flex items-center gap-2 bg-indigo-900/80 hover:bg-indigo-900 text-indigo-100 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-indigo-700/60 transition-all hover:border-indigo-500"
+                title="Unduh file template Excel (.xlsx) dengan format Nama Siswa, NIS, NISN, Kelas"
+              >
+                <Download className="w-4 h-4 text-indigo-300" /> Template Excel (.xlsx)
+              </button>
               <button
                 onClick={handleOpenAddModal}
                 className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-[0.98]"
@@ -376,11 +471,11 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
         <div className="flex items-center gap-2 justify-end">
           <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
-            title="Export ke CSV / Excel"
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all"
+            title="Export data ke file Excel (.xlsx)"
           >
-            <Download className="w-3.5 h-3.5" /> Export CSV
+            <Download className="w-3.5 h-3.5 text-emerald-600" /> Export Excel (.xlsx)
           </button>
           <button
             onClick={handleResetDefault}
@@ -590,7 +685,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                Import Data Sekolah dari Excel / CSV
+                Import Data Sekolah dari File Excel (.xlsx / .xls)
               </h3>
               <button
                 onClick={() => setIsImportModalOpen(false)}
@@ -600,21 +695,65 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
               </button>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-xs text-amber-800 space-y-1">
-              <p className="font-bold flex items-center gap-1.5 text-amber-900">
-                <Sparkles className="w-4 h-4 text-amber-600" /> Format Kolom Excel (Copy-Paste dari Ms. Excel / Google Sheets):
-              </p>
-              <p className="font-mono text-[11px] text-amber-900">
-                Kolom 1: Nama Siswa | Kolom 2: NIS | Kolom 3: NISN | Kolom 4: Kelas
-              </p>
+            <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-xs text-amber-900 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                    <Sparkles className="w-4 h-4 text-amber-600" /> Format Kolom Excel (Nama Siswa, NIS, NISN, Kelas):
+                  </p>
+                  <p className="font-mono text-[11px] text-amber-800 mt-0.5">
+                    Kolom 1: Nama Siswa | Kolom 2: NIS | Kolom 3: NISN | Kolom 4: Kelas
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg transition-all shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Unduh Template Excel (.xlsx)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLoadSampleTemplateText}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-[11px] rounded-lg transition-all"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-amber-700" /> Contoh Text
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* OPSI 1: UPLOAD FILE EXCEL */}
+            <div className="p-4 border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-2xl text-center space-y-2">
+              <Upload className="w-8 h-8 text-indigo-500 mx-auto" />
+              <div>
+                <p className="text-xs font-bold text-indigo-950">Upload Langsung File Excel (.xlsx / .xls)</p>
+                <p className="text-[11px] text-slate-500">Pilih file spreadsheet dari laptop/komputer Anda</p>
+              </div>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-sm transition-all">
+                <FileSpreadsheet className="w-4 h-4" /> Pilih File Excel
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-slate-200"></div>
+              <span className="flex-shrink mx-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Atau Tempelkan Teks Excel</span>
+              <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Tempelkan Baris Tabel Excel di Sini:
+                Tempelkan Baris Tabel Excel di Sini (Copy-Paste):
               </label>
               <textarea
-                rows={6}
+                rows={4}
                 value={rawImportText}
                 onChange={(e) => setRawImportText(e.target.value)}
                 placeholder="Ahmad Fauzi&#10914;22231001&#10914;0061234561&#10914;XII Merdeka 1&#10;Anisa Rahmawati&#10914;22231002&#10914;0061234562&#10914;XII Merdeka 1"
