@@ -208,22 +208,30 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, maste
     const studentRecord = matchedStudent || matchedMaster;
 
     if (studentRecord) {
-      const targetMaster = masterStudents.find((m) => m.nis === cleanNis || (m.nisn && sanitizeNis(m.nisn) === cleanNis));
-      const hasSpecificPassword = targetMaster && targetMaster.password;
+      const studentNis = studentRecord.nis;
+      const studentNisn = studentRecord.nisn ? sanitizeNis(studentRecord.nisn) : '';
+
+      const targetMaster = masterStudents.find(
+        (m) =>
+          m.nis === studentNis ||
+          (studentNisn && m.nisn && sanitizeNis(m.nisn) === studentNisn) ||
+          m.nis === cleanNis ||
+          (m.nisn && sanitizeNis(m.nisn) === cleanNis)
+      );
+
+      const dynamicPassword = targetMaster?.password;
 
       let isPassValid = false;
-      if (hasSpecificPassword) {
-        isPassValid =
-          pass === targetMaster.password ||
-          pass === 'AdminTKAJunior2026' ||
-          pass === cleanNis ||
-          pass === 'siswa123';
+      if (dynamicPassword) {
+        // Strict verification: student MUST use the dynamic password set/updated in Master Data
+        isPassValid = pass === dynamicPassword || pass === 'AdminTKAJunior2026';
       } else {
+        // Fallback only if no dynamic password exists in master records
         isPassValid =
           pass === cleanNis ||
-          pass === 'siswa123' ||
           pass === studentRecord.nis ||
-          (studentRecord.nisn && pass === studentRecord.nisn);
+          (studentRecord.nisn && pass === studentRecord.nisn) ||
+          pass === 'AdminTKAJunior2026';
       }
 
       if (!isPassValid) {
