@@ -88,6 +88,13 @@ export default function App() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sitaka_sidebar_minimized_v1') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [appsScriptUrl, setAppsScriptUrl] = useState('');
   const [isStudentFormOpen, setIsStudentFormOpen] = useState<boolean>(() => getStoredStudentFormAccess());
@@ -127,6 +134,15 @@ export default function App() {
         if (json.proktorList && Array.isArray(json.proktorList)) {
           saveProktorTeknisi(json.proktorList, false);
           setProktorList(json.proktorList);
+        }
+        if (json.masterStudents && Array.isArray(json.masterStudents)) {
+          const cleanMaster = json.masterStudents.map((ms: any) => ({
+            ...ms,
+            nis: ms.nis ? String(ms.nis).replace(/^'/, '').trim() : '',
+            nisn: formatNisn(ms.nisn),
+          }));
+          saveMasterSchoolStudents(cleanMaster, false);
+          setMasterSchoolStudents(cleanMaster);
         }
         const studentData = json.students || json.data;
         if (studentData && Array.isArray(studentData)) {
@@ -339,6 +355,13 @@ export default function App() {
       }
     }
   }, [userRole, activeTab]);
+
+  // Persist sidebar minimize state
+  useEffect(() => {
+    try {
+      localStorage.setItem('sitaka_sidebar_minimized_v1', String(isSidebarMinimized));
+    } catch (_) {}
+  }, [isSidebarMinimized]);
 
   const handleLogin = (role: UserRole, nis?: string) => {
     setUserRole(role);
@@ -804,10 +827,14 @@ export default function App() {
         isStudentFormOpen={isStudentFormOpen}
         onLogout={handleLogout}
         onOpenRbacModal={() => setIsRbacModalOpen(true)}
+        isSidebarMinimized={isSidebarMinimized}
+        setIsSidebarMinimized={setIsSidebarMinimized}
       />
 
       {/* Main Content Area right of left sidebar */}
-      <div className="flex-1 lg:pl-72 flex flex-col min-w-0 transition-all">
+      <div className={`flex-1 flex flex-col min-w-0 transition-all ${
+        isSidebarMinimized ? 'lg:pl-20' : 'lg:pl-72'
+      }`}>
         {/* Top Header Bar */}
         <Header
           activeTab={activeTab}
@@ -822,6 +849,8 @@ export default function App() {
           setIsCompactMode={setIsCompactMode}
           userRole={userRole}
           onOpenRbacModal={() => setIsRbacModalOpen(true)}
+          isSidebarMinimized={isSidebarMinimized}
+          setIsSidebarMinimized={setIsSidebarMinimized}
         />
 
         {/* Dynamic View Content */}

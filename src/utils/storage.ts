@@ -946,6 +946,48 @@ export function getStoredMasterSchoolStudents(): MasterSchoolStudent[] {
   }
 }
 
+export function syncMasterStudentToGoogleSheets(
+  student: any,
+  action: 'save' | 'delete' | 'clearAll',
+  id?: string,
+  nis?: string
+): void {
+  const url = getAppsScriptUrl();
+  if (!url) return;
+  try {
+    fetch(url.trim(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        target: 'master',
+        action: action,
+        student: action === 'save' ? student : undefined,
+        id: id || (action === 'delete' ? student : undefined),
+        nis: nis,
+      }),
+    }).catch((err) => console.log('Apps Script Master sync note:', err));
+  } catch (err) {
+    console.warn('Apps Script Master sync error:', err);
+  }
+}
+
+export function syncMasterStudentsBatchToGoogleSheets(students: MasterSchoolStudent[]): void {
+  const url = getAppsScriptUrl();
+  if (!url) return;
+  try {
+    fetch(url.trim(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'batchSave',
+        masterStudents: students,
+      }),
+    }).catch((err) => console.log('Apps Script Master batch sync note:', err));
+  } catch (err) {
+    console.warn('Apps Script Master batch sync error:', err);
+  }
+}
+
 export function saveMasterSchoolStudents(list: MasterSchoolStudent[], syncRemote = true): void {
   try {
     localStorage.setItem(MASTER_SCHOOL_STUDENTS_KEY, JSON.stringify(list));
@@ -953,6 +995,7 @@ export function saveMasterSchoolStudents(list: MasterSchoolStudent[], syncRemote
       list.forEach((item) => {
         syncMasterSchoolStudentToFirestore(item);
       });
+      syncMasterStudentsBatchToGoogleSheets(list);
     }
   } catch (error) {
     console.error('Error saving master school students:', error);
@@ -969,21 +1012,24 @@ export function addMasterSchoolStudent(item: Omit<MasterSchoolStudent, 'id'>): M
     updatedAt: new Date().toISOString(),
   };
   const updated = [newItem, ...current];
-  saveMasterSchoolStudents(updated);
+  saveMasterSchoolStudents(updated, true);
   return newItem;
 }
 
 export function updateMasterSchoolStudent(item: MasterSchoolStudent): void {
   const current = getStoredMasterSchoolStudents();
-  const updated = current.map((s) => (s.id === item.id ? { ...item, updatedAt: new Date().toISOString() } : s));
-  saveMasterSchoolStudents(updated);
+  const newItem = { ...item, updatedAt: new Date().toISOString() };
+  const updated = current.map((s) => (s.id === item.id ? newItem : s));
+  saveMasterSchoolStudents(updated, true);
 }
 
 export function deleteMasterSchoolStudent(id: string): void {
   const current = getStoredMasterSchoolStudents();
+  const target = current.find((s) => s.id === id);
   const updated = current.filter((s) => s.id !== id);
   saveMasterSchoolStudents(updated, false);
   deleteMasterSchoolStudentFromFirestore(id);
+  syncMasterStudentToGoogleSheets(id, 'delete', id, target?.nis);
 }
 
 export function deleteMultipleMasterSchoolStudents(ids: string[]): void {
@@ -991,6 +1037,21 @@ export function deleteMultipleMasterSchoolStudents(ids: string[]): void {
   const updated = current.filter((s) => !ids.includes(s.id));
   saveMasterSchoolStudents(updated, false);
   deleteMultipleMasterSchoolStudentsFromFirestore(ids);
+  
+  const url = getAppsScriptUrl();
+  if (url) {
+    try {
+      fetch(url.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          target: 'master',
+          action: 'deleteMultiple',
+          ids: ids,
+        }),
+      }).catch((err) => console.log('Apps Script Master deleteMultiple note:', err));
+    } catch (err) {}
+  }
 }
 
 export function clearAllMasterSchoolStudents(knownStudents?: MasterSchoolStudent[]): void {
@@ -1002,6 +1063,7 @@ export function clearAllMasterSchoolStudents(knownStudents?: MasterSchoolStudent
     const current = getStoredMasterSchoolStudents();
     current.forEach((s) => deleteMasterSchoolStudentFromFirestore(s.id));
   }
+  syncMasterStudentToGoogleSheets(null, 'clearAll');
 }
 
 

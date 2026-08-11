@@ -13,6 +13,8 @@ interface HeaderProps {
   setIsCompactMode?: (compact: boolean) => void;
   userRole?: UserRole | null;
   onOpenRbacModal?: () => void;
+  isSidebarMinimized?: boolean;
+  setIsSidebarMinimized?: (minimized: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   setIsCompactMode,
   userRole,
   onOpenRbacModal,
+  isSidebarMinimized,
+  setIsSidebarMinimized,
 }) => {
   const getTabTitle = () => {
     switch (activeTab) {
@@ -96,6 +100,17 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        {/* Desktop Sidebar Toggle Button */}
+        {setIsSidebarMinimized && (
+          <button
+            onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
+            className="hidden lg:flex p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+            title={isSidebarMinimized ? "Buka Menu Utama (Expand)" : "Sembunyikan/Kecilkan Menu (Minimize)"}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
 
         <div>
           <div className="flex items-center gap-2">

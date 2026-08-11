@@ -300,12 +300,14 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
 const SHEET_STUDENTS = "Data_Siswa_TKA";
 const SHEET_LAPTOPS = "Pendataan_Laptop_Sarana";
 const SHEET_PROKTOR = "Proktor_Teknisi_Lab";
+const SHEET_MASTER = "Kredensial_Login_Siswa";
 
 /**
- * Otomatis membuat & memformat 3 Sheet Tab Utama di Google Sheets:
+ * Otomatis membuat & memformat 4 Sheet Tab Utama di Google Sheets:
  * 1. Data_Siswa_TKA
  * 2. Pendataan_Laptop_Sarana
  * 3. Proktor_Teknisi_Lab
+ * 4. Kredensial_Login_Siswa
  */
 function setupAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -414,7 +416,35 @@ function setupAllSheets() {
     sheetProktor.setFrozenRows(1);
   }
 
-  return { sheetStudents, sheetLaptops, sheetProktor };
+  // 4. Sheet Kredensial Login & Data Master Siswa
+  let sheetMaster = ss.getSheetByName(SHEET_MASTER);
+  if (!sheetMaster) {
+    sheetMaster = ss.insertSheet(SHEET_MASTER);
+  }
+  const headersMaster = [
+    "ID",
+    "Nama Siswa",
+    "NIS / Username",
+    "NISN",
+    "Kelas",
+    "Password",
+    "Waktu Diperbarui"
+  ];
+  if (sheetMaster.getLastRow() === 0) {
+    sheetMaster.appendRow(headersMaster);
+    sheetMaster.getRange(1, 1, 1, headersMaster.length)
+               .setBackground("#4338ca")
+               .setFontColor("#ffffff")
+               .setFontWeight("bold")
+               .setHorizontalAlignment("center");
+    sheetMaster.setFrozenRows(1);
+  }
+  
+  // Format NIS (Kolom C), NISN (Kolom D), dan Password (Kolom F) sebagai Text agar tidak hilang format angka/huruf
+  sheetMaster.getRange("C:D").setNumberFormat("@");
+  sheetMaster.getRange("F:F").setNumberFormat("@");
+
+  return { sheetStudents, sheetLaptops, sheetProktor, sheetMaster };
 }
 
 function doGet(e) {
@@ -434,12 +464,17 @@ function doGet(e) {
     const proktorRows = sheets.sheetProktor.getDataRange().getValues();
     const proktorList = proktorRows.length > 1 ? proktorRows.slice(1).map(parseProktorRow) : [];
 
+    // Read Master Student Data
+    const masterRows = sheets.sheetMaster.getDataRange().getValues();
+    const masterStudents = masterRows.length > 1 ? masterRows.slice(1).map(parseMasterRow) : [];
+
     return responseJSON({
       status: "success",
-      message: "Data Administrasi TKA, Laptop & Proktor berhasil dimuat",
+      message: "Data Administrasi TKA, Laptop, Proktor & Kredensial berhasil dimuat",
       data: students,
       laptops: laptops,
-      proktorList: proktorList
+      proktorList: proktorList,
+      masterStudents: masterStudents
     });
   } catch (error) {
     return responseJSON({ status: "error", message: error.toString() });
@@ -533,6 +568,23 @@ function parseProktorRow(row) {
   };
 }
 
+function parseMasterRow(row) {
+  var parsedNis = row[2] ? row[2].toString().replace(/^'/, '').trim() : "";
+  var parsedNisn = row[3] ? row[3].toString().replace(/^'/, '').trim() : "";
+  if (parsedNisn && /^\d+$/.test(parsedNisn) && parsedNisn.length < 10) {
+    parsedNisn = parsedNisn.padStart(10, "0");
+  }
+  return {
+    id: row[0] ? row[0].toString() : "",
+    namaSiswa: row[1] ? row[1].toString() : "",
+    nis: parsedNis,
+    nisn: parsedNisn,
+    kelas: row[4] ? row[4].toString() : "",
+    password: row[5] ? row[5].toString() : "",
+    updatedAt: row[6] ? row[6].toString() : new Date().toISOString()
+  };
+}
+
 function doPost(e) {
   try {
     var contents = {};
@@ -565,7 +617,7 @@ function doPost(e) {
     }
 
     if (action === "batchSave") {
-      var countS = 0, countL = 0, countP = 0;
+      var countS = 0, countL = 0, countP = 0, countM = 0;
       if (Array.isArray(contents.students)) {
         contents.students.forEach(function(st) {
           handleStudentPost(sheets.sheetStudents, "save", { student: st });
@@ -584,10 +636,21 @@ function doPost(e) {
           countP++;
         });
       }
+      if (Array.isArray(contents.masterStudents)) {
+        // Clear then save all for batch overrides to maintain perfect parity
+        const lastRow = sheets.sheetMaster.getLastRow();
+        if (lastRow > 1) {
+          sheets.sheetMaster.getRange(2, 1, lastRow - 1, sheets.sheetMaster.getLastColumn()).clearContent();
+        }
+        contents.masterStudents.forEach(function(ms) {
+          handleMasterPost(sheets.sheetMaster, "save", { student: ms });
+          countM++;
+        });
+      }
       return responseJSON({
         status: "success",
-        message: "Batch save berhasil: " + countS + " siswa, " + countL + " laptop, " + countP + " proktor.",
-        counts: { students: countS, laptops: countL, proktor: countP }
+        message: "Batch save berhasil: " + countS + " siswa, " + countL + " laptop, " + countP + " proktor, " + countM + " kredensial.",
+        counts: { students: countS, laptops: countL, proktor: countP, masterStudents: countM }
       });
     }
 
@@ -597,6 +660,10 @@ function doPost(e) {
 
     if (target === "proktor" || action === "saveProktor" || action === "deleteProktor") {
       return handleProktorPost(sheets.sheetProktor, action, contents);
+    }
+
+    if (target === "master" || target === "masterStudent" || action === "saveMaster" || action === "deleteMaster") {
+      return handleMasterPost(sheets.sheetMaster, action, contents);
     }
 
     return handleStudentPost(sheets.sheetStudents, action, contents);
@@ -888,6 +955,96 @@ function handleProktorPost(sheet, action, contents) {
   }
 
   return responseJSON({ status: "error", message: "Action proktor tidak dikenal" });
+}
+
+function handleMasterPost(sheet, action, contents) {
+  if (action === "save" || action === "update" || action === "saveMaster") {
+    const student = contents.student || contents.data;
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == student.id || (student.nis && data[i][2] == student.nis)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    var rawNis = student.nis ? student.nis.toString().replace(/^'/, '').trim() : "";
+    var rawNisn = student.nisn ? student.nisn.toString().replace(/^'/, '').trim() : "";
+
+    if (rawNisn && /^\d+$/.test(rawNisn) && rawNisn.length < 10) {
+      rawNisn = rawNisn.padStart(10, "0");
+    }
+
+    var formattedNis = rawNis ? ("'" + rawNis) : "";
+    var formattedNisn = rawNisn ? ("'" + rawNisn) : "";
+
+    const rowData = [
+      student.id || "mst-" + Date.now(),
+      student.namaSiswa || "",
+      formattedNis,
+      formattedNisn,
+      student.kelas || "",
+      student.password || "",
+      new Date().toISOString().split("T")[0]
+    ];
+    
+    if (rowIndex > 0) {
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      sheet.appendRow(rowData);
+    }
+    
+    return responseJSON({ status: "success", message: "Data Kredensial Siswa berhasil disimpan di Google Sheets!", student: student });
+  }
+  
+  if (action === "delete" || action === "deleteMaster") {
+    const studentId = contents.id;
+    const studentNis = contents.nis ? contents.nis.toString().replace(/^'/, '').trim() : "";
+    const studentNisn = contents.nisn ? contents.nisn.toString().replace(/^'/, '').trim() : "";
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      var rowId = (data[i][0] || "").toString().trim();
+      var rowNis = (data[i][2] || "").toString().replace(/^'/, '').trim();
+      var rowNisn = (data[i][3] || "").toString().replace(/^'/, '').trim();
+      if (
+        (studentId && rowId == studentId) ||
+        (studentNis && rowNis == studentNis) ||
+        (studentNisn && rowNisn == studentNisn)
+      ) {
+        sheet.deleteRow(i + 1);
+        return responseJSON({ status: "success", message: "Data Kredensial Siswa berhasil dihapus" });
+      }
+    }
+    return responseJSON({ status: "error", message: "Data Kredensial Siswa tidak ditemukan" });
+  }
+
+  if (action === "clearAll" || action === "deleteAll") {
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+    }
+    return responseJSON({ status: "success", message: "Seluruh Data Kredensial Siswa berhasil dikosongkan dari Google Sheets" });
+  }
+
+  if (action === "deleteMultiple") {
+    const ids = contents.ids || [];
+    const data = sheet.getDataRange().getValues();
+    let count = 0;
+    for (let i = data.length - 1; i >= 1; i--) {
+      var rowId = (data[i][0] || "").toString().trim();
+      var rowNis = (data[i][2] || "").toString().replace(/^'/, '').trim();
+      var rowNisn = (data[i][3] || "").toString().replace(/^'/, '').trim();
+      if (ids.indexOf(rowId) > -1 || ids.indexOf(rowNis) > -1 || ids.indexOf(rowNisn) > -1) {
+        sheet.deleteRow(i + 1);
+        count++;
+      }
+    }
+    return responseJSON({ status: "success", message: count + " Data Kredensial Siswa berhasil dihapus dari Google Sheets" });
+  }
+
+  return responseJSON({ status: "error", message: "Action master tidak dikenal" });
 }
 
 function responseJSON(obj) {
