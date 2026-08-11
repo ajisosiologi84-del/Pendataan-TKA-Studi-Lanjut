@@ -61,6 +61,7 @@ import { MapelPilihanView } from './components/MapelPilihanView';
 import { SnbpCalculatorView } from './components/SnbpCalculatorView';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { LoginModal } from './components/LoginModal';
+import { RbacMatrixModal } from './components/RbacMatrixModal';
 
 export default function App() {
   const [userRole, setUserRole] = useState<UserRole | null>(() => {
@@ -90,6 +91,7 @@ export default function App() {
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [appsScriptUrl, setAppsScriptUrl] = useState('');
   const [isStudentFormOpen, setIsStudentFormOpen] = useState<boolean>(() => getStoredStudentFormAccess());
+  const [isRbacModalOpen, setIsRbacModalOpen] = useState(false);
   const [pendingBanPtSelection, setPendingBanPtSelection] = useState<{
     targetChoice: 'pilihan1' | 'pilihan2';
     ptn: string;
@@ -327,6 +329,16 @@ export default function App() {
       activityEvents.forEach((evt) => window.removeEventListener(evt, resetInactivityTimer));
     };
   }, [userRole, currentUserNis]);
+
+  // Guard active tab for Siswa role - only allow form, banpt, mapelPilihan, and snbpCalc
+  useEffect(() => {
+    if (userRole === 'siswa') {
+      const allowedSiswaTabs: NavigationTab[] = ['form', 'banpt', 'mapelPilihan', 'snbpCalc'];
+      if (!allowedSiswaTabs.includes(activeTab)) {
+        setActiveTab('form');
+      }
+    }
+  }, [userRole, activeTab]);
 
   const handleLogin = (role: UserRole, nis?: string) => {
     setUserRole(role);
@@ -791,6 +803,7 @@ export default function App() {
         currentUserNis={currentUserNis}
         isStudentFormOpen={isStudentFormOpen}
         onLogout={handleLogout}
+        onOpenRbacModal={() => setIsRbacModalOpen(true)}
       />
 
       {/* Main Content Area right of left sidebar */}
@@ -808,6 +821,7 @@ export default function App() {
           isCompactMode={isCompactMode}
           setIsCompactMode={setIsCompactMode}
           userRole={userRole}
+          onOpenRbacModal={() => setIsRbacModalOpen(true)}
         />
 
         {/* Dynamic View Content */}
@@ -846,6 +860,7 @@ export default function App() {
               setMasterStudents={setMasterSchoolStudents}
               onNavigateTab={(tab) => setActiveTab(tab)}
               userRole={userRole}
+              currentUserNis={currentUserNis}
             />
           )}
 
@@ -856,7 +871,7 @@ export default function App() {
               onCancel={() => {
                 setEditingStudent(null);
                 if (userRole === 'siswa') {
-                  setActiveTab('schoolData');
+                  setActiveTab('banpt');
                 } else {
                   setActiveTab('students');
                 }
@@ -961,6 +976,14 @@ export default function App() {
         student={detailStudent}
         onClose={() => setDetailStudent(null)}
         onEdit={handleSelectEdit}
+      />
+
+      {/* Matriks Otorisasi Pengguna (RBAC) Modal */}
+      <RbacMatrixModal
+        isOpen={isRbacModalOpen}
+        onClose={() => setIsRbacModalOpen(false)}
+        currentUserRole={userRole}
+        currentUserNis={currentUserNis}
       />
     </div>
   );

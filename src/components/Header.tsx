@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Plus, Download, RefreshCw, Database, Minimize2, Maximize2 } from 'lucide-react';
+import { Menu, Plus, Download, RefreshCw, Database, Minimize2, Maximize2, ShieldCheck } from 'lucide-react';
 import { NavigationTab, Student, UserRole } from '../types';
 import { exportStudentsToCSV } from '../utils/storage';
 
@@ -12,6 +12,7 @@ interface HeaderProps {
   isCompactMode?: boolean;
   setIsCompactMode?: (compact: boolean) => void;
   userRole?: UserRole | null;
+  onOpenRbacModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   isCompactMode,
   setIsCompactMode,
   userRole,
+  onOpenRbacModal,
 }) => {
   const getTabTitle = () => {
     switch (activeTab) {
@@ -111,6 +113,17 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center space-x-2">
+        {onOpenRbacModal && userRole === 'superadmin' && (
+          <button
+            onClick={onOpenRbacModal}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors shadow-2xs"
+            title="Lihat Matriks Otorisasi Pengguna (Role-Based Access Control)"
+          >
+            <ShieldCheck className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline">Matriks RBAC</span>
+          </button>
+        )}
+
         {setIsCompactMode && (
           <button
             onClick={() => setIsCompactMode(!isCompactMode)}

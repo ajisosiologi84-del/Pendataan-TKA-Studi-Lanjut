@@ -494,25 +494,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, maste
               </button>
             </form>
           ) : (
-            /* SISWA LOGIN FORM */
             <form onSubmit={handleStudentLogin} className="space-y-4">
-              <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200/80 space-y-3">
+              <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200/90 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-emerald-950 uppercase">
-                    Login Siswa (Form Input Data)
+                    Autentikasi Hak Akses Siswa
                   </span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                    NIS & Password
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold border border-emerald-300">
+                    Username = NIS
                   </span>
                 </div>
-                <p className="text-xs text-slate-600">
-                  Gunakan Username dan Password dari ADMIN untuk mengisi atau memperbarui data pilihan TKA dan Studi Lanjut.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Gunakan <strong>Username : NIS</strong> dan <strong>Password Akses Login</strong> sesuai Data Master Siswa & Kredensial Login yang diberikan oleh Super Admin/Sekolah.
                 </p>
 
                 <div className="space-y-3 pt-1">
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-700">
-                      Nomor Induk Siswa (NIS) / Username <span className="text-rose-500">*</span>
+                      Username : Nomor Induk Siswa (NIS) <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -523,7 +522,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, maste
                         value={nisInput}
                         onChange={(e) => setNisInput(e.target.value)}
                         disabled={lockoutTimer > 0}
-                        placeholder="Masukkan NIS / Username"
+                        placeholder="Masukkan NIS (Username)"
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono disabled:bg-slate-100 disabled:cursor-not-allowed"
                         autoFocus
                       />
@@ -532,7 +531,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, maste
 
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-700">
-                      Password <span className="text-rose-500">*</span>
+                      Password Akses Login <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -543,7 +542,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, maste
                         value={studentPasswordInput}
                         onChange={(e) => setStudentPasswordInput(e.target.value)}
                         disabled={lockoutTimer > 0}
-                        placeholder="Masukkan Password"
+                        placeholder="Password Sesuai Data Master Siswa"
                         className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                       />
                       <button
@@ -554,6 +553,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, students, maste
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    <p className="text-[10px] text-slate-500 pt-0.5">
+                      *Password tertera pada Stiker Kartu Login atau Data Master Siswa.
+                    </p>
                   </div>
                 </div>
               </div>

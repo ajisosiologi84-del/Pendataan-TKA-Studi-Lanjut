@@ -169,6 +169,24 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
     }
   };
 
+  // Effect to automatically auto-fill logged-in student data matching NIS
+  useEffect(() => {
+    if (userRole === 'siswa' && availableMasterStudents.length > 0) {
+      const matched = availableMasterStudents[0];
+      setSelectedMasterId(matched.id);
+      setFormData((prev) => ({
+        ...prev,
+        namaSiswa: matched.namaSiswa || prev.namaSiswa,
+        nis: matched.nis || prev.nis,
+        nisn: matched.nisn || prev.nisn,
+        kelas: matched.kelas || prev.kelas,
+      }));
+      setAutoFillNotification(
+        `⚡ Auto-Fill Otomatis Berhasil dari Input Data Sekolah: ${matched.namaSiswa} (${matched.kelas}) - NIS: ${matched.nis}`
+      );
+    }
+  }, [userRole, availableMasterStudents]);
+
   // Effect to handle selection coming from BAN-PT main menu directory
   useEffect(() => {
     if (prefilledBanPtSelection) {
@@ -871,32 +889,43 @@ export const StudentFormView: React.FC<StudentFormViewProps> = ({
             {/* AUTO-FILL DARI INPUT DATA SEKOLAH */}
             {userRole === 'siswa' ? (
               availableMasterStudents.length > 0 ? (
-                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200/80 p-4 rounded-2xl space-y-2.5 shadow-xs">
-                  <div className="flex items-center justify-between">
+                <div className="bg-gradient-to-r from-emerald-50 via-indigo-50/50 to-blue-50 border-2 border-emerald-300/80 p-4 rounded-2xl space-y-3 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <label className="text-xs font-bold text-indigo-950 flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-indigo-600" />
-                      ⚡ Auto-Fill Otomatis Sesuai NIS Akun Anda ({currentUserNis})
+                      <Building2 className="w-4 h-4 text-emerald-600" />
+                      ⚡ Auto-Fill Otomatis Sesuai NIS Login ({currentUserNis})
                     </label>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> NIS Terverifikasi
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 w-fit">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Matriks Hak Akses NIS Terverifikasi
                     </span>
                   </div>
 
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Data diri Anda terhubung langsung dengan <strong>Input Data Sekolah</strong> (Super Admin) secara otomatis khusus untuk NIS/NISN Anda:
+                    Data diri Anda terhubung langsung secara otomatis dari <strong>Input Data Sekolah (Data Master Super Admin)</strong> khusus untuk nama & NIS akun Anda:
                   </p>
 
-                  <select
-                    value={selectedMasterId}
-                    onChange={(e) => handleSelectMasterStudent(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                  >
-                    {availableMasterStudents.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.namaSiswa} — {m.kelas} (NIS: {m.nis} | NISN: {m.nisn})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="text-[10px] uppercase font-extrabold text-indigo-600 tracking-wider">
+                        Nama Siswa Terhubung:
+                      </div>
+                      <div className="text-sm font-black text-slate-900">
+                        {availableMasterStudents[0]?.namaSiswa || 'Siswa'}
+                      </div>
+                      <div className="text-xs text-slate-500 font-medium">
+                        Kelas: <span className="font-bold text-slate-700">{availableMasterStudents[0]?.kelas || '-'}</span> | NIS: <span className="font-bold text-slate-700">{availableMasterStudents[0]?.nis || '-'}</span> | NISN: <span className="font-bold text-slate-700">{availableMasterStudents[0]?.nisn || '-'}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectMasterStudent(availableMasterStudents[0].id)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-xs shrink-0 flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Terapkan Ke Form</span>
+                    </button>
+                  </div>
 
                   {autoFillNotification && (
                     <div className="p-2.5 bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200">

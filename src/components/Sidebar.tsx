@@ -33,6 +33,7 @@ interface SidebarProps {
   currentUserNis?: string | null;
   isStudentFormOpen?: boolean;
   onLogout: () => void;
+  onOpenRbacModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -46,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUserNis,
   isStudentFormOpen = true,
   onLogout,
+  onOpenRbacModal,
 }) => {
   const allNavItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string | number; description: string; roles: UserRole[] }[] = [
     {
@@ -61,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Users className="w-5 h-5" />,
       badge: totalStudents,
       description: 'Tabel & pencarian siswa',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'schoolData',
@@ -69,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Building2 className="w-5 h-5" />,
       badge: 'Master',
       description: 'Data awal Master Siswa, NIS, NISN & Kelas',
-      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi', 'siswa'],
+      roles: ['superadmin', 'walikelas', 'bk', 'proktor', 'teknisi'],
     },
     {
       id: 'form',
@@ -280,6 +282,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {userRole?.toUpperCase()}
             </span>
           </div>
+
+          {onOpenRbacModal && userRole === 'superadmin' && (
+            <button
+              onClick={onOpenRbacModal}
+              className="w-full py-2 px-3 bg-indigo-900/40 hover:bg-indigo-800/80 text-indigo-200 hover:text-white rounded-lg text-xs font-bold border border-indigo-700/50 transition-all flex items-center justify-center gap-1.5"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> Matriks RBAC Hak Akses
+            </button>
+          )}
 
           <button
             onClick={onLogout}

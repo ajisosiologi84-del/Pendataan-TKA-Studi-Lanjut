@@ -76,6 +76,7 @@ interface SchoolDataViewProps {
   setMasterStudents: React.Dispatch<React.SetStateAction<MasterSchoolStudent[]>>;
   onNavigateTab?: (tab: NavigationTab) => void;
   userRole?: string | null;
+  currentUserNis?: string | null;
 }
 
 export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
@@ -83,6 +84,7 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
   setMasterStudents,
   onNavigateTab,
   userRole,
+  currentUserNis,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedKelas, setSelectedKelas] = useState('ALL');
@@ -136,6 +138,14 @@ export const SchoolDataView: React.FC<SchoolDataViewProps> = ({
 
   // Filtered Students
   const filteredStudents = masterStudents.filter((student) => {
+    if (userRole === 'siswa' && currentUserNis) {
+      const cleanTarget = currentUserNis.trim();
+      const isMyNis =
+        (student.nis && student.nis.toString().trim() === cleanTarget) ||
+        (student.nisn && student.nisn.toString().trim() === cleanTarget);
+      if (!isMyNis) return false;
+    }
+
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !q ||
