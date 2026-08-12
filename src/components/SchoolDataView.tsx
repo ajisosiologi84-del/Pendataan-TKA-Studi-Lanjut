@@ -575,19 +575,11 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2\t3M7K8W`;
                 INPUT DATA SEKOLAH & KARTU LOGIN
               </h2>
               <p className="text-slate-300 text-xs lg:text-sm mt-1 max-w-2xl leading-relaxed">
-                Kelola data master siswa (Nama, NIS, NISN, Kelas) dan password acak siswa untuk keamanan login. Output kartu login siswa dapat dicetak masal dalam bentuk <strong className="text-amber-300">Stiker Tempel</strong> berdasarkan kelas.
+                Kelola data master siswa (Nama, NIS, NISN, Kelas) dan password siswa untuk keamanan login. Output kartu login siswa dapat dicetak masal dalam bentuk <strong className="text-amber-300">Stiker Tempel</strong> berdasarkan kelas.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <button
-                onClick={handleAutoGeneratePasswords}
-                className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-md shadow-amber-600/30 hover:scale-[1.02] active:scale-[0.98]"
-                title="Generasikan password acak otomatis untuk siswa"
-              >
-                <Shuffle className="w-4 h-4" /> Acak Password Masal
-              </button>
-
               <button
                 onClick={() => setIsPrintCardsModalOpen(true)}
                 className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98]"
@@ -629,7 +621,7 @@ Citra Dewi Kartika\t22231004\t0061234564\tXII MIPA 2\t3M7K8W`;
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Password Sistem Acak</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Password Terdaftar</p>
             <h3 className="text-2xl font-black text-amber-600 mt-1">
               {masterStudents.filter((s) => !!s.password).length} / {masterStudents.length}
             </h3>
